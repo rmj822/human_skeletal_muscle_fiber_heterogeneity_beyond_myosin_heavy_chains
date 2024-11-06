@@ -1,0 +1,8 @@
+Package: human_skeletal_muscle_fiber_heterogeneity_beyond_myosin_heavy_chains
+Type: Project
+Version: 0.0.1
+Imports:
+    ggplot2,
+    knitr,
+    rmarkdown
+Encoding: UTF-8
