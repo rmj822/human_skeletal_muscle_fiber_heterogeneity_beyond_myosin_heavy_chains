@@ -84,10 +84,10 @@ violins_heterofiber <- data_plot_heterofiber |>
                                          "P4",
                                          "P5"))
 
-# ggplot2::ggsave(here::here("doc/figures/figure_1/violins_heterofiber_participants.png"),
-#                 height = 60,
-#                 width = 60,
-#                 units = "mm")
+ggplot2::ggsave(here::here("doc/figures/figure_1_S1/violins_heterofiber_participants.png"),
+                height = 60,
+                width = 60,
+                units = "mm")
 
 # CV ----------------------------------------------------------------------
 
@@ -240,7 +240,7 @@ data_plot |>
     )
 # ggplot2::coord_cartesian(xlim = c(7.55, 23), clip = "off")
 
-ggplot2::ggsave(filename = here::here("doc/figures/figure_1/CVs_proteomics.png"),
+ggplot2::ggsave(filename = here::here("doc/figures/figure_1_S1/CVs_proteomics.png"),
                 height = 60,
                 width = 60,
                 units = "mm")
@@ -248,10 +248,12 @@ ggplot2::ggsave(filename = here::here("doc/figures/figure_1/CVs_proteomics.png")
 
 # Dynamic range plot ------------------------------------------------------
 
-sum_of_intensities <- colSums(proteomics_filtered,
+sum_of_intensities <- colSums(proteomics_filtered |>
+                                  tibble::column_to_rownames("Gene.name"),
                               na.rm = TRUE)
 
 rel_abundance <- proteomics_filtered |>
+    tibble::column_to_rownames("Gene.name")|>
     t() |>
     as.data.frame()
 
@@ -285,49 +287,50 @@ ggplot2::ggplot() +
 
     # Add all genes
     ggplot2::geom_point(data = mean_expression_all,
-                        aes(x=order,
+                        ggplot2::aes(
+                            x=order,
                             y=log10_rel_abundance),
                         colour = "#045a8d",
                         size = 0.25,
                         alpha = 0.5) +
 
     # Add horizontal lines to indicate % instead of log scale
-    geom_hline(yintercept = log(20,10), linetype="dashed", linewidth=0.2) +
-    geom_hline(yintercept = log(5,10), linetype="dashed", linewidth=0.2) +
-    geom_hline(yintercept = log(1,10), linetype="dashed", linewidth=0.2) +
-    geom_hline(yintercept = log(0.1,10), linetype="dashed", linewidth=0.2) +
-    geom_hline(yintercept = log(0.01,10), linetype="dashed", linewidth=0.2) +
+    ggplot2::geom_hline(yintercept = log(20,10), linetype="dashed", linewidth=0.2) +
+    ggplot2::geom_hline(yintercept = log(5,10), linetype="dashed", linewidth=0.2) +
+    ggplot2::geom_hline(yintercept = log(1,10), linetype="dashed", linewidth=0.2) +
+    ggplot2::geom_hline(yintercept = log(0.1,10), linetype="dashed", linewidth=0.2) +
+    ggplot2::geom_hline(yintercept = log(0.01,10), linetype="dashed", linewidth=0.2) +
 
     # Add text for % expression
-    annotate("text", x=2900, y=log(28,10), label= "20%", colour="black", fontface=2, size=2) +
-    annotate("text", x=2900, y=log(7,10), label= "5%", colour="black", fontface=2, size=2) +
-    annotate("text", x=2900, y=log(1.4,10), label= "1%", colour="black", fontface=2, size=2) +
-    annotate("text", x=2900, y=log(0.14,10), label= "0.1%", colour="black", fontface=2, size=2) +
-    annotate("text", x=2900, y=log(0.014,10), label= "0.01%", colour="black", fontface=2, size=2) +
+    ggplot2::annotate("text", x=2900, y=log(28,10), label= "20%", colour="black", fontface=2, size=2) +
+    ggplot2::annotate("text", x=2900, y=log(7,10), label= "5%", colour="black", fontface=2, size=2) +
+    ggplot2::annotate("text", x=2900, y=log(1.4,10), label= "1%", colour="black", fontface=2, size=2) +
+    ggplot2::annotate("text", x=2900, y=log(0.14,10), label= "0.1%", colour="black", fontface=2, size=2) +
+    ggplot2::annotate("text", x=2900, y=log(0.014,10), label= "0.01%", colour="black", fontface=2, size=2) +
 
     # Add custom labels:
-    geom_label_repel(data = mean_expression_all %>% dplyr::filter(gene %in% c("MYH7",
+    ggrepel::geom_label_repel(data = mean_expression_all |> dplyr::filter(gene %in% c("MYH7",
                                                                                    "MYH2",
                                                                                    "ACTA1",
                                                                                    "TNNT1",
                                                                                    "TNNT3")),
-                     mapping = aes(order, log10_rel_abundance, label = gene),
+                     mapping = ggplot2::aes(order, log10_rel_abundance, label = gene),
                      size = 1.8, label.padding=0.1, max.overlaps = Inf, min.segment.length=0.1, segment.size=0.2, force = 10) +
 
 # Change design
-    ylab("% total intensities, 10log") +
-    xlab("Protein rank") +
-    theme_classic() +
-    ggtitle("Proteomics") +
-    theme(
-        text = element_text(face="bold", colour="black", size = 6),
-        plot.title = element_text(face = "bold", color = "black", size = 8, hjust = 0.5),
-        strip.text = element_text(colour = "white"),
-        strip.background = element_rect(fill="black"),
+    ggplot2::ylab("% total intensities, 10log") +
+    ggplot2::xlab("Protein rank") +
+    ggplot2::theme_classic() +
+    ggplot2::ggtitle("Proteomics") +
+    ggplot2::theme(
+        text = ggplot2::element_text(face="bold", colour="black", size = 6),
+        plot.title = ggplot2::element_text(face = "bold", color = "black", size = 8, hjust = 0.5),
+        strip.text = ggplot2::element_text(colour = "white"),
+        strip.background = ggplot2::element_rect(fill="black"),
         legend.position = "none",
     )
 
-# ggsave(here::here("doc/figures/figure_1/dynamic_range_proteome.png"),
+# ggplot2::ggsave(here::here("doc/figures/figure_1_S1/dynamic_range_proteome.png"),
 #        units = "mm",
 #        height = 60,
 #        width = 60)
