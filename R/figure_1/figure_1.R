@@ -378,7 +378,7 @@ proteomics_ft %>%
     annotate("text", x=50, y=(bottom_knee_MYH1+3), label= "8%", colour="black", fontface=2)
 
 ################################################################################################################################################
-##################################################    COMBINED PLOTS Tx and Px     #############################################################
+##################################################    PANEL B, C and D     #############################################################
 ################################################################################################################################################
 
 
@@ -477,9 +477,7 @@ MYH1_TvsP <- ggplot() +
 ggsave(MYH1_TvsP, filename = here::here("doc/figures/figure_1/threshold_MYH1.png"), width = 40, height = 40, units="mm")
 
 
-################################################################################################################################################
-##################################################     ASSIGN FIBER TYPES     ##################################################################
-################################################################################################################################################
+# Assign fiber types
 
 # MYH --------------------------------------------------------------------
 counts_ft <- counts_ft %>%
@@ -872,6 +870,7 @@ data_fiber_type |>
         y = "Count"
     )
 
+write.csv(data_fiber_type, here::here("data/data_fiber_type_saved.csv"))
 
 # Fiber_typing_curves_MYHs ------------------------------------------------
 
@@ -911,6 +910,10 @@ rectangle_colors <- data.frame(
     end = c(330, 413, 786, 974),
     fiber_type = c("Type I", "Hybrid I/IIA", "Type IIA", "Hybrid IIA/IIX")
 )
+
+################################################################################################################################################
+########################################################      PANEL F   ############################################################################
+################################################################################################################################################
 
 order_matrix |>
     ggplot2::ggplot() +
@@ -1097,59 +1100,10 @@ ggplot2::ggsave(
     units = "mm"
 )
 
-# Exporting MYH abundances for dot blot-selected fibers -------------------
 
-dot_blot_fibers <- c(
-    "P3_fibNumber33",
-    "P5_fibNumber175",
-    "P3_fibNumber180",
-    "P4_fibNumber162",
-    "P1_fibNumber192",
-    "P2_fibNumber36",
-    "P5_fibNumber159",
-    "P2_fibNumber90",
-    "P2_fibNumber164",
-    "P1_fibNumber177",
-    "P5_fibNumber35",
-    "P5_fibNumber187",
-    "P5_fibNumber128",
-    "P5_fibNumber78",
-    "P4_fibNumber136",
-    "P4_fibNumber159",
-    "P4_fibNumber188",
-    "P4_fibNumber60",
-    "P4_fibNumber24",
-    "P3_fibNumber108",
-    "P4_fibNumber108",
-    "P3_fibNumber110",
-    "P4_fibNumber182",
-    "P2_fibNumber29",
-    "P4_fibNumber152",
-    "P3_fibNumber177",
-    "P2_fibNumber194",
-    "P4_fibNumber199",
-    "P3_fibNumber88",
-    "P3_fibNumber193",
-    "P4_fibNumber57",
-    "P3_fibNumber100",
-    "P1_fibNumber100",
-    "P3_fibNumber185",
-    "P3_fibNumber80",
-    "P1_fibNumber171",
-    "P1_fibNumber198",
-    "P5_fibNumber199",
-    "P4_fibNumber181",
-    "P5_fibNumber119"
-)
+# Fiber typing curves transcriptomics -------------------------------------
 
-data_dot_blot <- data_fiber_type  |>
-    dplyr::filter(fiber_ID %in% dot_blot_fibers)  |>
-    dplyr::arrange(match(fiber_ID, dot_blot_fibers)) |>
-    dplyr::select(fiber_ID, MYH7, MYH2, MYH1, fiber_type) |>
-    dplyr::mutate("sample_order_left_to_right" = rep(c(1:10), 4))
 
-readr::write_csv(data_dot_blot,
-                 here::here("data/dot_blot/MS_fiber_type_dot_blot_fibers.csv"))
 
 # Transcriptomics
 
@@ -1416,10 +1370,6 @@ ggsave(plot_MYH_v2, filename = here::here("doc/figures/figure_1/MYH_curves_trans
 
 # UMAPS -------------------------------------------------------------------
 
-################################################################################################################################################
-################################################       CREATE SEURAT OBJECT      ###############################################################
-################################################################################################################################################
-
 # Filtered and processed data
 data_proteomics <- read.csv(here::here("data/proteomics_pca_data.csv")) # 974 fibers for 1685 proteins
 
@@ -1428,29 +1378,15 @@ data_proteomics <- data_proteomics |>
     tibble::column_to_rownames("Protein")
 
 metadata <- vroom::vroom(
-    here::here("data-raw/metadata_proteomics.csv")
+    here::here("data/metadata_proteomics_fiber_type.csv")
 ) |>
-    dplyr::select(!1) |>
-    # dplyr::filter(fiberID %in% colnames(data_pca)) |>
-    # dplyr::filter(!duplicated(fiberID)) |>
-    dplyr::inner_join(
-        data_fiber_type |>
-            dplyr::rename("fiberID" = "fiber_ID") |>
-            dplyr::select(fiberID, fiber_type)
-    ) |>
-    dplyr::arrange(desc(fiberID))
+    dplyr::select(!1)
 
-seurat_proteome <- Seurat::CreateSeuratObject(counts = data_proteomics |>
-                                                dplyr::select(metadata$fiberID),
-                                            project = "proteomics_seurat",
-                                            assay = "LFQ",
-                                            meta.data = metadata |>
-                                                tibble::column_to_rownames("fiberID"))
+seurat_proteome <- Seurat::CreateSeuratObject(counts = data_proteomics,
+                                              meta.data = metadata)
 
+# PCA ---------------------------------------------------------------------
 
-################################################################################################################################################
-########################################################      PCA   ############################################################################
-################################################################################################################################################
 
 # Find Variable features
 seurat_proteome <- Seurat::FindVariableFeatures(seurat_proteome,
@@ -1466,11 +1402,7 @@ seurat_proteome <- Seurat::RunPCA(object = seurat_proteome,  features = Seurat::
 PCA_PC1_2 <- Seurat::DimPlot(seurat_proteome, reduction = "pca", dims = c(1,2), group.by = "fiber_type") # No separation of fiber type by PC1, good separation by PC2
 PCA_PC1_3 <- Seurat::DimPlot(seurat_proteome, reduction = "pca", dims = c(1,3), group.by = "fiber_type") # No separation at all by PC3
 
-################################################################################################################################################
-################################################      Identify significant PCS    ##############################################################
-################################################################################################################################################
-
-
+# Identify significant PCS
 # Elbow plot: visualizes SD of each PC, search for where SD begins to plateau --------
 elbow_plot <- Seurat::ElbowPlot(object = seurat_proteome,
                                 ndims = 40) # Biggest difference after 6 PCs, plateau only after about 30 PCs
@@ -1496,12 +1428,6 @@ pcs
 
 # Conclusion: use first 6 PCs to cluster (number less important with new versions of Seurat, biggest difference is time to compute with more PCs)
 
-
-################################################################################################################################################
-####################################################      CLUSTERING      ######################################################################
-################################################################################################################################################
-
-
 # Graph-based clustering using K-nearest neighbor graph  ---------------------------------
 
 # Determine the K-nearest neighbor graph (dims is the selected number of PCs from previous step)
@@ -1510,12 +1436,10 @@ seurat_proteome <- Seurat::FindNeighbors(object = seurat_proteome,  dims = 1:6)
 # Determine the clusters for various resolutions (resolution between 0.4-1.4 is often best for scRNAseq --> determine which resolution is best for our dataset)
 seurat_proteome <- Seurat::FindClusters(object = seurat_proteome, resolution = c(0.4))
 
-################################################################################################################################################
-################################################      DIMENSIONALITY REDUCTION   ##############################################################
-################################################################################################################################################
+# Dimensionality reduction
 
 # Run UMAP ----------------------------------------------------------------
-seurat_proteome <- Seurat::RunUMAP(seurat_proteome, dims = 1:6)
+seurat_proteome <- Seurat::RunUMAP(seurat_proteome, dims = 1:6, seed.use = 42)
 
 # Run T-SNE ----------------------------------------------------------------
 seurat_proteome <- Seurat::RunTSNE(seurat_proteome, dims = 1:6)
@@ -1523,7 +1447,7 @@ seurat_proteome <- Seurat::RunTSNE(seurat_proteome, dims = 1:6)
 
 
 ################################################################################################################################################
-#################################################     Choosing Resolution 0.4  ##############################################################
+#################################################     Panel H  ##############################################################
 ################################################################################################################################################
 
 
@@ -1560,6 +1484,10 @@ Seurat::DimPlot(
 #     width = 65,
 #     units = "mm"
 # )
+
+################################################################################################################################################
+########################################################      PANEL J   ############################################################################
+################################################################################################################################################
 
 # Feature plots -----------------------------------------------------------
 
@@ -1643,16 +1571,6 @@ ggplot2::ggsave(here::here("doc/figures/umaps_now_in_fig1/feature_plot_MYHs.png"
                 units = "mm")
 
 # UMAP subject ------------------------------------------------------------
-
-seurat_proteome@meta.data <- seurat_proteome@meta.data |>
-    dplyr::mutate(subject = dplyr::case_when(
-        subject == "FOR2" ~ "P1",
-        subject == "FOR4" ~ "P2",
-        subject == "FOR9" ~ "P3",
-        subject == "FOR10" ~ "P4",
-        subject == "FOR11" ~ "P5",
-        TRUE ~ "NAN"
-    ))
 
 my_cols <- viridisLite::turbo(n = 5)
 
