@@ -1441,6 +1441,17 @@ seurat_proteome <- Seurat::FindClusters(object = seurat_proteome, resolution = c
 # Run UMAP ----------------------------------------------------------------
 seurat_proteome <- Seurat::RunUMAP(seurat_proteome, dims = 1:6, seed.use = 42)
 
+seurat_metadata <- seurat_proteome@meta.data |>
+    dplyr::mutate(
+        seurat_clusters = dplyr::case_when(
+            RNA_snn_res.0.4 %in% c(1, 3) ~ "slow",
+            TRUE ~ "fast"
+        )
+    )
+
+write.csv(seurat_metadata,
+          here::here("data/metadata_proteomics_seurat_clusters.csv"))
+
 # Run T-SNE ----------------------------------------------------------------
 seurat_proteome <- Seurat::RunTSNE(seurat_proteome, dims = 1:6)
 
