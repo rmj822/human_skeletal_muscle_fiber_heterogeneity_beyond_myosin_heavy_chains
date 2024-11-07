@@ -1018,3 +1018,810 @@ ggplot2::ggsave(here::here("doc/figures/figure_6/figure_6G.png"),
                 units = "mm",
                 height = 45,
                 width = 45)
+
+# Save DE results:
+
+write.csv(DE_actin_controls,
+          here::here("data/DE_analysis_MD/actin_v_controls.csv"))
+
+write.csv(DE_troponin_controls,
+          here::here("data/DE_analysis_MD/troponin_v_controls.csv"))
+
+write.csv(DE_troponin_actin,
+          here::here("data/DE_analysis_MD/actin_v_troponin.csv"))
+
+
+################################################################################################################################################
+#################################################     Panel H  ##############################################################
+################################################################################################################################################
+
+library(org.Hs.eg.db)
+
+# actin_vs_controls --------------------------------------------------------
+
+actin_v_controls <- vroom::vroom(here::here("data/DE_analysis_MD/actin_v_controls.csv")) |>
+    dplyr::filter(!is.na(logFC)) |>
+    dplyr::arrange(desc(logFC)) |>
+    dplyr::pull(logFC, name = Genes)
+
+GSEA_actin_control <- clusterProfiler::gseGO(
+    actin_v_controls,
+    keyType = "SYMBOL",
+    ont = "BP",
+    OrgDb = org.Hs.eg.db,
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "BH",
+    verbose = TRUE,
+)
+
+GSEA_actin_control <- clusterProfiler::simplify(GSEA_actin_control,
+                                                cutoff = 0.5,
+                                                by = "p.adjust",
+                                                select_fun = min)
+
+dotplot_title <- c(
+    `activated` = "Actin",
+    `suppressed` = "Control"
+)
+
+clusterProfiler::dotplot(GSEA_actin_control,
+                         showCategory = 10,
+                         split = ".sign",
+                         font.size = 8) +
+    ggplot2::facet_grid(. ~ .sign,
+                        labeller = ggplot2::as_labeller(dotplot_title)) +
+    ggplot2::ggtitle("GSEA Actin vs Control") +
+    ggplot2::scale_color_viridis_c(option = "plasma") +
+    ggplot2::theme(plot.title = ggplot2::element_text(size = 10, face = "bold")) +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5))
+
+# troponin vs control --------------------------------------------------------
+
+troponin_v_controls <- vroom::vroom(here::here("data/DE_analysis_MD/troponin_v_controls.csv")) |>
+    dplyr::filter(!is.na(logFC)) |>
+    dplyr::arrange(desc(logFC)) |>
+    dplyr::pull(logFC, name = Genes)
+
+GSEA_troponin_control <- clusterProfiler::gseGO(
+    troponin_v_controls,
+    keyType = "SYMBOL",
+    ont = "BP",
+    OrgDb = org.Hs.eg.db,
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "BH",
+    verbose = TRUE,
+)
+
+GSEA_troponin_control <- clusterProfiler::simplify(GSEA_troponin_control,
+                                                   cutoff = 0.5,
+                                                   by = "p.adjust",
+                                                   select_fun = min)
+
+dotplot_title <- c(
+    `activated` = "Troponin",
+    `suppressed` = "Control"
+)
+
+clusterProfiler::dotplot(GSEA_troponin_control,
+                         showCategory = 10,
+                         split = ".sign",
+                         font.size = 8) +
+    ggplot2::facet_grid(. ~ .sign,
+                        labeller = ggplot2::as_labeller(dotplot_title)) +
+    ggplot2::ggtitle("Gene Set Enrichment Analysis") +
+    ggplot2::scale_color_viridis_c(option = "plasma") +
+    ggplot2::theme(plot.title = ggplot2::element_text(size = 10, face = "bold")) +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5))
+
+
+# troponin_vs_actin -------------------------------------------------------
+
+troponin_v_actin <- vroom::vroom(here::here("data/DE_analysis_MD/actin_v_troponin.csv")) |>
+    dplyr::filter(!is.na(logFC)) |>
+    dplyr::arrange(desc(logFC)) |>
+    dplyr::pull(logFC, name = Genes)
+
+GSEA_troponin_v_actin <- clusterProfiler::gseGO(
+    troponin_v_actin,
+    keyType = "SYMBOL",
+    ont = "BP",
+    OrgDb = org.Hs.eg.db,
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "BH",
+    verbose = TRUE,
+)
+
+# GSEA_troponin_v_actin <- clusterProfiler::simplify(GSEA_troponin_v_actin,
+#                                                    cutoff = 0.5,
+#                                                    by = "p.adjust",
+#                                                    select_fun = min)
+
+dotplot_title <- c(
+    `activated` = "Actin",
+    `suppressed` = "Troponin"
+)
+
+clusterProfiler::dotplot(GSEA_troponin_v_actin,
+                         showCategory = 10,
+                         split = ".sign",
+                         font.size = 8) +
+    ggplot2::facet_grid(. ~ .sign,
+                        labeller = ggplot2::as_labeller(dotplot_title)) +
+    ggplot2::ggtitle("Gene Set Enrichment Analysis") +
+    ggplot2::scale_color_viridis_c(option = "plasma") +
+    ggplot2::theme(plot.title = ggplot2::element_text(size = 10, face = "bold")) +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5))
+
+
+# actin_vs_controls in type 1 --------------------------------------------------------
+
+actin_v_controls_type_1 <- vroom::vroom(here::here("data/DE_analysis_MD/actin_v_controls_type_1.csv")) |>
+    dplyr::filter(!is.na(logFC)) |>
+    dplyr::arrange(desc(logFC)) |>
+    dplyr::pull(logFC, name = Genes)
+
+GSEA_actin_control_type_1 <- clusterProfiler::gseGO(
+    actin_v_controls_type_1,
+    keyType = "SYMBOL",
+    ont = "BP",
+    OrgDb = org.Hs.eg.db,
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "BH",
+    verbose = TRUE,
+)
+
+# GSEA_actin_control_type_1 <- clusterProfiler::simplify(GSEA_actin_control_type_1,
+#                                                 cutoff = 0.5,
+#                                                 by = "p.adjust",
+#                                                 select_fun = min)
+
+dotplot_title <- c(
+    `activated` = "Actin",
+    `suppressed` = "Control"
+)
+
+clusterProfiler::dotplot(GSEA_actin_control_type_1,
+                         showCategory = 10,
+                         split = ".sign",
+                         font.size = 8) +
+    ggplot2::facet_grid(. ~ .sign,
+                        labeller = ggplot2::as_labeller(dotplot_title)) +
+    ggplot2::ggtitle("GSEA Actin vs Control Type 1 fibers") +
+    ggplot2::scale_color_viridis_c(option = "plasma") +
+    ggplot2::theme(plot.title = ggplot2::element_text(size = 10, face = "bold")) +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5))
+
+# troponin_vs_controls in type 1 --------------------------------------------------------
+
+troponin_v_controls_type_1 <- vroom::vroom(here::here("data/DE_analysis_MD/troponin_v_controls_type_1.csv")) |>
+    dplyr::filter(!is.na(logFC)) |>
+    dplyr::arrange(desc(logFC)) |>
+    dplyr::pull(logFC, name = Genes)
+
+GSEA_troponin_control_type_1 <- clusterProfiler::gseGO(
+    troponin_v_controls_type_1,
+    keyType = "SYMBOL",
+    ont = "BP",
+    OrgDb = org.Hs.eg.db,
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "BH",
+    verbose = TRUE,
+)
+
+GSEA_troponin_control_type_1 <- clusterProfiler::simplify(GSEA_troponin_control_type_1,
+                                                          cutoff = 0.5,
+                                                          by = "p.adjust",
+                                                          select_fun = min)
+
+dotplot_title <- c(
+    `activated` = "Troponin",
+    `suppressed` = "Control"
+)
+
+clusterProfiler::dotplot(GSEA_troponin_control_type_1,
+                         showCategory = 10,
+                         split = ".sign",
+                         font.size = 8) +
+    ggplot2::facet_grid(. ~ .sign,
+                        labeller = ggplot2::as_labeller(dotplot_title)) +
+    ggplot2::ggtitle("GSEA Troponin vs Control Type 1 fibers") +
+    ggplot2::scale_color_viridis_c(option = "plasma") +
+    ggplot2::theme(plot.title = ggplot2::element_text(size = 10, face = "bold")) +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5))
+
+# troponin_vs_actin_type_1 -------------------------------------------------------
+
+# It doesn't find any signifficantly enriched term
+troponin_v_actin_type_1 <- vroom::vroom(here::here("data/DE_analysis_MD/actin_v_troponin_type_1.csv")) |>
+    dplyr::filter(!is.na(logFC)) |>
+    dplyr::arrange(desc(logFC)) |>
+    dplyr::pull(logFC, name = Genes)
+
+GSEA_troponin_v_actin_type_1 <- clusterProfiler::gseGO(
+    troponin_v_actin_type_1,
+    keyType = "SYMBOL",
+    ont = "BP",
+    OrgDb = org.Hs.eg.db,
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "BH",
+    verbose = TRUE,
+)
+
+GSEA_troponin_v_actin_type_1 <- clusterProfiler::simplify(GSEA_troponin_v_actin_type_1,
+                                                          cutoff = 0.5,
+                                                          by = "p.adjust",
+                                                          select_fun = min)
+#
+# dotplot_title <- c(
+#     `activated` = "Actin",
+#     `suppressed` = "Troponin"
+# )
+#
+# clusterProfiler::dotplot(GSEA_troponin_v_actin_type_1,
+#                          showCategory = 10,
+#                          split = ".sign",
+#                          font.size = 8) +
+#     ggplot2::facet_grid(. ~ .sign,
+#                         labeller = ggplot2::as_labeller(dotplot_title)) +
+#     ggplot2::ggtitle("GSEA Troponin vs actin Type 1 fibers") +
+#     ggplot2::scale_color_viridis_c(option = "plasma") +
+#     ggplot2::theme(plot.title = ggplot2::element_text(size = 10, face = "bold")) +
+#     ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5))
+
+# actin_vs_controls in type 2 --------------------------------------------------------
+
+actin_v_controls_type_2 <- vroom::vroom(here::here("data/DE_analysis_MD/actin_v_controls_type_2.csv")) |>
+    dplyr::filter(!is.na(logFC)) |>
+    dplyr::arrange(desc(logFC)) |>
+    dplyr::pull(logFC, name = Genes)
+
+GSEA_actin_control_type_2 <- clusterProfiler::gseGO(
+    actin_v_controls_type_2,
+    keyType = "SYMBOL",
+    ont = "BP",
+    OrgDb = org.Hs.eg.db,
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "BH",
+    verbose = TRUE,
+)
+
+# GSEA_actin_control_type_2 <- clusterProfiler::simplify(GSEA_actin_control_type_2,
+#                                                        cutoff = 0.5,
+#                                                        by = "p.adjust",
+#                                                        select_fun = min)
+
+dotplot_title <- c(
+    `activated` = "Actin",
+    `suppressed` = "Control"
+)
+
+clusterProfiler::dotplot(GSEA_actin_control_type_2,
+                         showCategory = 10,
+                         split = ".sign",
+                         font.size = 8) +
+    ggplot2::facet_grid(. ~ .sign,
+                        labeller = ggplot2::as_labeller(dotplot_title)) +
+    ggplot2::ggtitle("GSEA Actin vs Control Type 2A fibers") +
+    ggplot2::scale_color_viridis_c(option = "plasma") +
+    ggplot2::theme(plot.title = ggplot2::element_text(size = 10, face = "bold")) +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5))
+
+# troponin_vs_controls in type 2 --------------------------------------------------------
+
+troponin_v_controls_type_2 <- vroom::vroom(here::here("data/DE_analysis_MD/troponin_v_controls_type_2.csv")) |>
+    dplyr::filter(!is.na(logFC)) |>
+    dplyr::arrange(desc(logFC)) |>
+    dplyr::pull(logFC, name = Genes)
+
+GSEA_troponin_control_type_2 <- clusterProfiler::gseGO(
+    troponin_v_controls_type_2,
+    keyType = "SYMBOL",
+    ont = "BP",
+    OrgDb = org.Hs.eg.db,
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "BH",
+    verbose = TRUE,
+)
+
+GSEA_troponin_control_type_2 <- clusterProfiler::simplify(GSEA_troponin_control_type_2,
+                                                          cutoff = 0.5,
+                                                          by = "p.adjust",
+                                                          select_fun = min)
+
+dotplot_title <- c(
+    `activated` = "Troponin",
+    `suppressed` = "Control"
+)
+
+clusterProfiler::dotplot(GSEA_troponin_control_type_2,
+                         showCategory = 10,
+                         split = ".sign",
+                         font.size = 8) +
+    ggplot2::facet_grid(. ~ .sign,
+                        labeller = ggplot2::as_labeller(dotplot_title)) +
+    ggplot2::ggtitle("GSEA Troponin vs Control Type 2A fibers") +
+    ggplot2::scale_color_viridis_c(option = "plasma") +
+    ggplot2::theme(plot.title = ggplot2::element_text(size = 10, face = "bold")) +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5))
+
+
+# troponin_vs_actin_type_2 -------------------------------------------------------
+
+troponin_v_actin_type_2 <- vroom::vroom(here::here("data/DE_analysis_MD/actin_v_troponin_type_2.csv")) |>
+    dplyr::filter(!is.na(logFC)) |>
+    dplyr::arrange(desc(logFC)) |>
+    dplyr::pull(logFC, name = Genes)
+
+GSEA_troponin_v_actin_type_2 <- clusterProfiler::gseGO(
+    troponin_v_actin_type_2,
+    keyType = "SYMBOL",
+    ont = "BP",
+    OrgDb = org.Hs.eg.db,
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "BH",
+    verbose = TRUE,
+)
+
+GSEA_troponin_v_actin_type_2 <- clusterProfiler::simplify(GSEA_troponin_v_actin_type_2,
+                                                          cutoff = 0.5,
+                                                          by = "p.adjust",
+                                                          select_fun = min)
+
+dotplot_title <- c(
+    `activated` = "Actin",
+    `suppressed` = "Troponin"
+)
+
+clusterProfiler::dotplot(GSEA_troponin_v_actin_type_2,
+                         showCategory = 10,
+                         split = ".sign",
+                         font.size = 8) +
+    ggplot2::facet_grid(. ~ .sign,
+                        labeller = ggplot2::as_labeller(dotplot_title)) +
+    ggplot2::ggtitle("GSEA Troponin vs actin Type 2 fibers") +
+    ggplot2::scale_color_viridis_c(option = "plasma") +
+    ggplot2::theme(plot.title = ggplot2::element_text(size = 10, face = "bold")) +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5))
+
+# Creating Combined GSEA plot ---------------------------------------------
+
+result_GSEA_actin_control <- GSEA_actin_control@result |>
+    tibble::remove_rownames()
+
+write.csv(result_GSEA_actin_control,
+          here::here("data/MD_GSEA_fiber_type/result_GSEA_actin_control.csv"))
+
+result_GSEA_actin_control_type_1 <- GSEA_actin_control_type_1@result |>
+    tibble::remove_rownames()
+
+write.csv(result_GSEA_actin_control_type_1,
+          here::here("data/MD_GSEA_fiber_type/result_GSEA_actin_control_type_1.csv"))
+
+result_GSEA_actin_control_type_2 <- GSEA_actin_control_type_2@result |>
+    tibble::remove_rownames()
+
+write.csv(result_GSEA_actin_control_type_2,
+          here::here("data/MD_GSEA_fiber_type/result_GSEA_actin_control_type_2.csv"))
+
+result_GSEA_troponin_control <- GSEA_troponin_control@result |>
+    tibble::remove_rownames()
+
+write.csv(result_GSEA_troponin_control,
+          here::here("data/MD_GSEA_fiber_type/result_GSEA_troponin_control.csv"))
+
+result_GSEA_troponin_control_type_1 <- GSEA_troponin_control_type_1@result |>
+    tibble::remove_rownames()
+
+write.csv(result_GSEA_troponin_control_type_1,
+          here::here("data/MD_GSEA_fiber_type/result_GSEA_troponin_control_type_1.csv"))
+
+result_GSEA_troponin_control_type_2 <- GSEA_troponin_control_type_2@result |>
+    tibble::remove_rownames()
+
+write.csv(result_GSEA_troponin_control_type_2,
+          here::here("data/MD_GSEA_fiber_type/result_GSEA_troponin_control_type_2.csv"))
+
+result_GSEA_actin_troponin <- GSEA_troponin_v_actin@result |>
+    tibble::remove_rownames()
+
+write.csv(result_GSEA_actin_troponin,
+          here::here("data/MD_GSEA_fiber_type/result_GSEA_actin_troponin.csv"))
+
+result_GSEA_actin_troponin_type_1 <- GSEA_troponin_v_actin_type_1@result |>
+    tibble::remove_rownames()
+#
+write.csv(result_GSEA_actin_troponin_type_1,
+          here::here("data/MD_GSEA_fiber_type/result_GSEA_actin_troponin_type_1.csv"))
+
+result_GSEA_actin_troponin_type_2 <- GSEA_troponin_v_actin_type_2@result |>
+    tibble::remove_rownames()
+
+write.csv(result_GSEA_actin_troponin_type_2,
+          here::here("data/MD_GSEA_fiber_type/result_GSEA_actin_troponin_type_2.csv"))
+
+# Figure GSEA -------------------------------------------------------------
+
+selected_terms <- c(
+    "oxidative phosphorylation",
+    "immune system process",
+    "cell adhesion"
+)
+
+
+data_plot_actin_control <- result_GSEA_actin_control |>
+    dplyr::filter(Description %in% selected_terms) |>
+    dplyr::mutate(condition = dplyr::case_when(
+        enrichmentScore > 0 ~ "upregulated_actin",
+        TRUE ~ "downregulated_actin"
+    )) |>
+    dplyr::select(Description, condition, p.adjust, enrichmentScore)
+
+data_plot_actin_control_type_1 <- result_GSEA_actin_control_type_1 |>
+    dplyr::filter(Description %in% selected_terms) |>
+    dplyr::mutate(condition = dplyr::case_when(
+        enrichmentScore > 0 ~ "upregulated_actin_type_1",
+        TRUE ~ "downregulated_actin_type_1"
+    )) |>
+    dplyr::select(Description, condition, p.adjust, enrichmentScore)
+
+data_plot_actin_control_type_2 <- result_GSEA_actin_control_type_2 |>
+    dplyr::filter(Description %in% selected_terms) |>
+    dplyr::mutate(condition = dplyr::case_when(
+        enrichmentScore > 0 ~ "upregulated_actin_type_2",
+        TRUE ~ "downregulated_actin_type_2"
+    )) |>
+    dplyr::select(Description, condition, p.adjust, enrichmentScore)
+
+data_plot_troponin_control <- result_GSEA_troponin_control |>
+    dplyr::filter(Description %in% selected_terms) |>
+    dplyr::mutate(condition = dplyr::case_when(
+        enrichmentScore > 0 ~ "upregulated_troponin",
+        TRUE ~ "downregulated_troponin"
+    )) |>
+    dplyr::select(Description, condition, p.adjust, enrichmentScore)
+
+data_plot_troponin_control_type_1 <- result_GSEA_troponin_control_type_1 |>
+    dplyr::filter(Description %in% selected_terms) |>
+    dplyr::mutate(condition = dplyr::case_when(
+        enrichmentScore > 0 ~ "upregulated_troponin_type_1",
+        TRUE ~ "downregulated_troponin_type_1"
+    )) |>
+    dplyr::select(Description, condition, p.adjust, enrichmentScore)
+
+#creating empty column for upregulated_troponin_type_1 in dot plot
+data_plot_troponin_control_type_1[2,1] <- "oxidative phosphorylation"
+data_plot_troponin_control_type_1[2,2] <- "upregulated_troponin_type_1"
+data_plot_troponin_control_type_1[2,3] <- NA
+data_plot_troponin_control_type_1[2,4] <- NA
+
+data_plot_troponin_control_type_2 <- result_GSEA_troponin_control_type_2 |>
+    dplyr::filter(Description %in% selected_terms) |>
+    dplyr::mutate(condition = dplyr::case_when(
+        enrichmentScore > 0 ~ "upregulated_troponin_type_2",
+        TRUE ~ "downregulated_troponin_type_2"
+    )) |>
+    dplyr::select(Description, condition, p.adjust, enrichmentScore)
+
+data_plot_actin_troponin <- result_GSEA_actin_troponin |>
+    dplyr::filter(Description %in% selected_terms) |>
+    dplyr::mutate(condition = dplyr::case_when(
+        enrichmentScore > 0 ~ "upregulated_troponin_vs_actin",
+        TRUE ~ "upregulated_actin_vs_troponin"
+    )) |>
+    dplyr::select(Description, condition, p.adjust, enrichmentScore)
+
+data_plot_actin_troponin_type_1 <- result_GSEA_actin_troponin_type_1 |>
+    dplyr::filter(Description %in% selected_terms) |>
+    dplyr::mutate(condition = dplyr::case_when(
+        enrichmentScore > 0 ~ "upregulated_troponin_vs_actin_type_1",
+        TRUE ~ "upregulated_actin_vs_troponin_type_1"
+    )) |>
+    dplyr::select(Description, condition, p.adjust, enrichmentScore)
+
+#creating empty columns for upregulated_troponin_vs_actin_type_1 and upregulated_actin_vs_troponin_type_1 in dot plot
+data_plot_actin_troponin_type_1[1,1] <- "oxidative phosphorylation"
+data_plot_actin_troponin_type_1[1,2] <- "upregulated_troponin_vs_actin_type_1"
+data_plot_actin_troponin_type_1[1,3] <- NA
+data_plot_actin_troponin_type_1[1,4] <- NA
+
+data_plot_actin_troponin_type_1[2,1] <- "oxidative phosphorylation"
+data_plot_actin_troponin_type_1[2,2] <- "upregulated_actin_vs_troponin_type_1"
+data_plot_actin_troponin_type_1[2,3] <- NA
+data_plot_actin_troponin_type_1[2,4] <- NA
+
+
+data_plot_actin_troponin_type_2 <- result_GSEA_actin_troponin_type_2 |>
+    dplyr::filter(Description %in% selected_terms) |>
+    dplyr::mutate(condition = dplyr::case_when(
+        enrichmentScore > 0 ~ "upregulated_troponin_vs_actin_type_2",
+        TRUE ~ "upregulated_actin_vs_troponin_type_2"
+    )) |>
+    dplyr::select(Description, condition, p.adjust, enrichmentScore)
+
+#creating empty columns for upregulated_troponin_vs_actin_type_2 in dot plot
+data_plot_actin_troponin_type_2[2,1] <- "oxidative phosphorylation"
+data_plot_actin_troponin_type_2[2,2] <- "upregulated_troponin_vs_actin_type_2"
+data_plot_actin_troponin_type_2[2,3] <- NA
+data_plot_actin_troponin_type_2[2,4] <- NA
+
+
+
+data_plot_combined <- rbind(data_plot_actin_control,
+                            data_plot_actin_control_type_1,
+                            data_plot_actin_control_type_2,
+                            data_plot_troponin_control,
+                            data_plot_troponin_control_type_1,
+                            data_plot_troponin_control_type_2,
+                            data_plot_actin_troponin,
+                            data_plot_actin_troponin_type_1,
+                            data_plot_actin_troponin_type_2) |>
+    dplyr::mutate(enrichmentScore = abs(enrichmentScore))
+
+
+desired_order <- c(
+    rep("downregulated_actin", 3),
+    rep("downregulated_actin_type_1", 3),
+    rep("downregulated_actin_type_2", 2),
+    rep("upregulated_actin", 1),
+    rep("upregulated_actin_type_1", 3),
+    rep("upregulated_actin_type_2", 1),
+    rep("downregulated_troponin", 3),
+    rep("downregulated_troponin_type_1", 3),
+    rep("downregulated_troponin_type_2", 3),
+    rep("upregulated_troponin", 3),
+    rep("upregulated_troponin_type_1", 1),
+    rep("upregulated_troponin_type_2", 3),
+    rep("upregulated_troponin_vs_actin", 2),
+    rep("upregulated_troponin_vs_actin_type_1", 1),
+    rep("upregulated_troponin_vs_actin_type_2", 1),
+    rep("upregulated_actin_vs_troponin", 3),
+    rep("upregulated_actin_vs_troponin_type_1", 1),
+    rep("upregulated_actin_vs_troponin_type_2", 1)
+)
+
+data_plot_combined <- data_plot_combined |>
+    dplyr::mutate(order = factor(condition,
+                                 levels = unique(desired_order))) |>
+    dplyr::mutate(order_terms = factor(Description,
+                                       levels = c(
+                                           "oxidative phosphorylation",
+                                           "immune system process",
+                                           "cell adhesion"
+                                       ))) |>
+    dplyr::arrange(order_terms) |>
+    dplyr::arrange(order)
+
+
+# forcats::fct_reorder(data_plot_combined$condition, desired_order)
+
+data_plot_combined |>
+    ggplot2::ggplot(
+        ggplot2::aes(x = order,
+                     y = order_terms,
+                     size = enrichmentScore,
+                     color = -log10(p.adjust))
+    ) +
+    ggplot2::geom_point() +
+    ggplot2::scale_color_viridis_c("-log10\n(P.value)", option = "plasma") +
+    ggplot2::theme_bw() +
+    ggplot2::theme(
+        axis.text.x = ggplot2::element_blank(),
+        axis.ticks.x = ggplot2::element_blank(),
+        text = ggplot2::element_text(size = 8),
+        axis.title = ggplot2::element_blank(),
+        legend.key.size = ggplot2::unit(4, "mm"),
+        legend.position = "bottom",
+        plot.margin=grid::unit(c(1,0,0,0), "mm")
+    )
+
+ggplot2::ggsave(here::here("doc/figures/figure_6/figure_6H.pdf"),
+                height = 60,
+                width = 128,
+                units = "mm"
+)
+
+################################################################################################################################################
+#################################################     Panel I and J  ##############################################################
+################################################################################################################################################
+
+# Coloring PCA by GO terms ------------------------------------------------
+
+library(org.Hs.eg.db)
+meta_go2gene <- as.list(org.Hs.egGO2EG)
+meta_go2goName <- as.list(GO.db::GOTERM)
+
+# naming the goID with a human readable title. AnnotationDBI handles these 'higher' level classes.
+meta_go2goName <- sapply(
+    meta_go2goName,
+    AnnotationDbi::Term
+)
+
+# using a named vector to not mixup our names
+names(meta_go2gene) <- meta_go2goName[names(meta_go2gene)]
+
+# translating entrez ids to hugo symbols.
+meta_entrez2symbol <- AnnotationDbi::select(
+    org.Hs.eg.db,
+    unique(unlist(meta_go2gene)),
+    "SYMBOL",
+    "ENTREZID"
+)
+
+# using the power of data.table to quickly match vectors in a list
+meta_entrez2symbol <- data.table::as.data.table(meta_entrez2symbol)
+data.table::setkey(meta_entrez2symbol, ENTREZID)
+
+# data.table syntax is unique, but it is also blazing fast.
+meta_go2gene <- lapply(meta_go2gene, \(i){
+    meta_entrez2symbol[i, unique(SYMBOL)]
+})
+meta_go2gene <- reshape2::melt(meta_go2gene)
+colnames(meta_go2gene) <- c("SYMBOL", "GO")
+
+# Mitochondrial term ------------------------------------------------------
+
+vector_mito <- meta_go2gene[grep("mitochondria",
+                                 meta_go2gene$GO),
+                            "SYMBOL"] |>
+    unique()
+
+mito_filtered <- data_wrangled |>
+    tibble::rownames_to_column("Gene.name") |>
+    dplyr::filter(Gene.name %in% vector_mito) |>
+    dplyr::select(!Gene.name)
+
+total_intensity <- colSums(data_wrangled, na.rm = T)
+
+rel_abundance_mito <- (colSums(mito_filtered,
+                               na.rm = T) / total_intensity) * 100
+
+data_pca_mito <- as.data.frame(rel_abundance_mito) |>
+    tibble::rownames_to_column("fiberID") |>
+    dplyr::inner_join(data_pca)
+
+
+data_mito_proteins <- factoextra::get_pca_var(pca_object)$coor |>
+    as.data.frame() |>
+    dplyr::select(Dim.1, Dim.2) |>
+    dplyr::mutate(dplyr::across(.cols = everything(),
+                                ~ .x * 50)) |>
+    tibble::rownames_to_column("Genes") |>
+    dplyr::filter(Genes %in% vector_mito)
+
+data_mito_proteins <- data_mito_proteins |>
+    dplyr::mutate("x.centroid" = 0) |>
+    dplyr::mutate("y.centroid" = 0) |>
+    dplyr::mutate(label = Genes)
+
+data_pca_mito |>
+    ggplot2::ggplot(ggplot2::aes(
+        x = PC1,
+        y = PC2,
+        color = rel_abundance_mito
+    )) +
+    ggplot2::geom_point(alpha = 0.5) +
+    ggplot2::scale_color_viridis_c("Rel. \nAbundance", option = "plasma") +
+    # ggplot2::geom_segment(
+    #     data = data_mito_proteins,
+    #     ggplot2::aes(x = x.centroid,
+    #                  y = y.centroid,
+    #                  xend = Dim.1,
+    #                  yend = Dim.2),
+    #     color = "black",
+    #     alpha = 0.5,
+    #     arrow = grid::arrow(type = "closed",
+    #                         length = ggplot2::unit(1, "mm"))
+    # ) +
+    # ggrepel::geom_label_repel(data = data_mito_proteins,
+    #                           ggplot2::aes(
+    #                               x = Dim.1,
+    #                               y = Dim.2,
+    #                               label = label),
+    #                           size = 2,
+    #                           color = "black",
+    #                           label.padding = 0.1,
+    #                           min.segment.length = 0.1,
+    #                           segment.size = 0.2,
+    #                           force = 20,
+    #                           max.overlaps = Inf) +
+    ggplot2::theme_minimal() +
+    ggplot2::ggtitle("PCA by mitochondria GO term") +
+    ggplot2::xlab("PC1 (12.4%)") +
+    ggplot2::ylab("PC2 (10.6%)") +
+    ggplot2::theme(
+        text = ggplot2::element_text(face="bold", colour="black", size=7),
+        axis.text = ggplot2::element_text(size=7),
+        plot.title = ggplot2::element_text(hjust = 0.5,
+                                           vjust = 3),
+        legend.position = "bottom",
+        legend.key.height = ggplot2::unit(2, "mm")
+    )
+
+ggplot2::ggsave(here::here("doc/figures/figure_6/figure_6I.png"),
+                height = 60,
+                width = 60,
+                units = "mm")
+
+# Coloring by ECM ---------------------------------------------------------
+
+vector_ecm <- meta_go2gene[grep("extracellular matrix",
+                                meta_go2gene$GO),
+                           "SYMBOL"] |>
+    unique()
+
+ecm_filtered <- data_wrangled |>
+    tibble::rownames_to_column("Gene.name") |>
+    dplyr::filter(Gene.name %in% vector_ecm) |>
+    dplyr::select(!Gene.name)
+
+total_intensity <- colSums(data_wrangled, na.rm = T)
+
+rel_abundance_ecm <- (colSums(ecm_filtered,
+                              na.rm = T) / total_intensity) * 100
+
+data_pca_ecm <- as.data.frame(rel_abundance_ecm) |>
+    tibble::rownames_to_column("fiberID") |>
+    dplyr::inner_join(data_pca)
+
+
+data_ecm_proteins <- factoextra::get_pca_var(pca_object)$coor |>
+    as.data.frame() |>
+    dplyr::select(Dim.1, Dim.2) |>
+    dplyr::mutate(dplyr::across(.cols = everything(),
+                                ~ .x * 50)) |>
+    tibble::rownames_to_column("Genes") |>
+    dplyr::filter(Genes %in% vector_ecm)
+
+data_ecm_proteins <- data_ecm_proteins |>
+    dplyr::mutate("x.centroid" = 0) |>
+    dplyr::mutate("y.centroid" = 0) |>
+    dplyr::mutate(label = Genes)
+
+data_pca_ecm |>
+    ggplot2::ggplot(ggplot2::aes(
+        x = PC1,
+        y = PC2,
+        color = rel_abundance_ecm
+    )) +
+    ggplot2::geom_point(alpha = 0.5) +
+    ggplot2::scale_color_viridis_c("Rel. \nAbundance", option = "plasma") +
+    # ggplot2::geom_segment(
+    #     data = data_ecm_proteins,
+    #     ggplot2::aes(x = x.centroid,
+    #                  y = y.centroid,
+    #                  xend = Dim.1,
+    #                  yend = Dim.2),
+    #     alpha = 0.5,
+    #     color = "black",
+    #     arrow = grid::arrow(type = "closed",
+    #                         length = ggplot2::unit(1, "mm"))
+    # ) +
+    # ggrepel::geom_label_repel(data = data_ecm_proteins,
+    #                           ggplot2::aes(
+    #                               x = Dim.1,
+    #                               y = Dim.2,
+    #                               label = label),
+    #                           size = 2,
+    #                           color = "black",
+    #                           label.padding = 0.1,
+    #                           min.segment.length = 0.1,
+    #                           segment.size = 0.2,
+    #                           force = 20,
+    #                           max.overlaps = Inf) +
+    ggplot2::theme_minimal() +
+    ggplot2::ggtitle("PCA by ECM GO term") +
+    ggplot2::xlab("PC1 (12.4%)") +
+    ggplot2::ylab("PC2 (10.6%)") +
+    ggplot2::theme(
+        text = ggplot2::element_text(face="bold", colour="black", size=7),
+        axis.text = ggplot2::element_text(size=7),
+        plot.title = ggplot2::element_text(hjust = 0.5,
+                                           vjust = 3),
+        legend.position = "bottom",
+        legend.key.height = ggplot2::unit(2, "mm")
+    )
+
+ggplot2::ggsave(here::here("doc/figures/figure_6/figure_6J.png"),
+                height = 60,
+                width = 60,
+                units = "mm")
