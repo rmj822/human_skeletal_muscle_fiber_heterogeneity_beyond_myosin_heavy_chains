@@ -1,0 +1,821 @@
+---
+title: "Interpretation of SCENIC output"
+author: "Robin Browaeys"
+date: "2024-05-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load in packages, seuratObject and SCENIC output
+
+## Packages
+```{r}
+library(SCENIC)
+library(SCopeLoomR)
+library(Seurat)
+library(ggbeeswarm)
+library(RColorBrewer)
+library(viridis)
+library(tidyverse)
+```
+
+## Seurat object
+```{r}
+seuratObj = readRDS("../data/seurat_obj.rds")
+seuratObj@meta.data$fiber_type_seurat = factor(seuratObj@meta.data$fiber_type_seurat, levels = c("fast","hybrid", "slow"))
+seuratObj = SetIdent(seuratObj, value = "fiber_type_seurat")
+DefaultAssay(seuratObj) = "RNA"
+seuratObj = NormalizeData(seuratObj)
+seuratObj = ScaleData(seuratObj)
+DimPlot(seuratObj)
+```
+To facilitate some of the downstream plots, save the UMAP coordinates
+```{r}
+dimred = as.matrix(seuratObj@reductions$umap@cell.embeddings)
+colnames(dimred) = c("dim1", "dim2")
+```
+
+## SCENIC output (loom file)
+```{r}
+loom = open_loom(file.path = "../output/fiber_types_pySCENIC.loom")
+
+regulonAUC = get_regulons_AUC(loom, column.attr.name='RegulonsAUC')
+thresholds = get_regulon_thresholds(loom)
+# FIX THRESHOLDS: names and values switched in output. pySCENIC/loom bug?
+thresholds_values = names(thresholds)
+thresholds_names = thresholds
+thresholds_values = thresholds_values %>% as.double()
+
+thresholds = thresholds_values
+names(thresholds) = thresholds_names
+
+regulons_incidMat = get_regulons(loom, column.attr.name="Regulons")
+regulons = regulonsToGeneLists(regulons_incidMat)
+
+close_loom(loom)
+```
+
+# Explore the SCENIC "raw" output:
+
+Regulon AUC / TF activity scores per cell:
+```{r}
+regulonAUC %>% head()
+AUCdata = getAUC(regulonAUC) 
+AUCdata[1:10, 1:10]
+```
+
+Scale these AUC scores between 0-1 for heatmap visualizations later on
+```{r}
+AUCdata_scaled = AUCdata %>% BBmisc::normalize("range")
+AUCdata_scaled[1:10, 1:10]
+```
+
+Threshold value per regulon: AUC/activity of regulaon should be higher to be considered "active" in a cell
+```{r}
+thresholds %>% head()
+```
+
+Based on this threshold, we can get a list indicating in which cells which regulons are active:
+```{r}
+regulonsCells = setNames(lapply(names(thresholds), 
+                                 function(x) {
+                                   trh = thresholds[x]
+                                   names(which(getAUC(regulonAUC)[x,]>trh))
+                                 }),names(thresholds))
+regulonsCells %>% head()
+```
+Now transform this information into a binary regulon activity matrix
+```{r}
+regulonActivity = reshape2::melt(regulonsCells) %>% magrittr::set_colnames(c("cell","regulon"))
+binaryRegulonActivity = t(table(regulonActivity[,1], regulonActivity[,2]))
+class(binaryRegulonActivity) = "matrix"
+binaryRegulonActivity[1:10,1:10]
+```
+Get an idea of the nr of cells in which a regulon is active and vice-versa
+```{r}
+par(mfrow=c(1,2))
+boxplot(rowSums(binaryRegulonActivity), main="nCells per regulon",
+          sub='number of cells \nthat have the regulon active',
+          col="darkolivegreen1", border="#001100", lwd=2, frame=FALSE)
+boxplot(colSums(binaryRegulonActivity), main="nRegulons per Cell",
+          sub='number of regulons \nactive per cell',
+          col="darkolivegreen1", border="#001100", lwd=2, frame=FALSE)
+```
+
+Matrix of TF-target links: which gene (target; in columns) belongs to which regulon (TF; in rows)
+```{r}
+regulons_incidMat[1:10, 1:10] %>% head()
+```
+
+List of TF-target links: which gene (target; elements of sublist) belongs to which regulon (TF; names of sublist)
+
+```{r}
+regulons %>% head(2)
+```
+
+Conclusion:
+In the SCENIC output we have:
+1) TF activity scores per cell
+2) matrix/list: is TF active in cell or not
+2) target genes predicted to be regulated by each of these TFs ("regulons")
+
+Further postprocessing: check: are all cell names from Seurat object in the TF activity matrix and vice versa?
+
+```{r}
+table(colnames(regulonAUC) %in% Cells(seuratObj))
+table(Cells(seuratObj) %in% colnames(regulonAUC))
+```
+
+Looks good here
+
+# CELL-LEVEL ANALYSIS - SCENIC Heatmaps of Binary Regulon Activity 
+
+Now we will create heatmaps of binary regulon activity per cell. 
+To do this, the SCENIC vignette recommends splitting up regulons in several categories:
+
+## Create regulon categories
+
+### All regulons, including duplicated regulons
+```{r}
+regulonSelection = list()
+regulonSelection[["All regulons \n (including duplicated regulons)"]] = rownames(binaryRegulonActivity)
+length(rownames(binaryRegulonActivity))
+```
+### Only non-duplicated regulons
+```{r}
+binaryRegulonActivity_nonDupl = binaryRegulonActivity[which(rownames(binaryRegulonActivity) %in% onlyNonDuplicatedExtended(rownames(binaryRegulonActivity))),]
+
+# check how many duplicated regulons are there in this dataset
+table(rownames(binaryRegulonActivity) %in% onlyNonDuplicatedExtended(rownames(binaryRegulonActivity)))
+```
+__--> all regulons here are non-duplicated__
+
+### Regulons active in > 1% cells
+```{r}
+minCells = ncol(binaryRegulonActivity) * .01 # 1% cells
+```
+
+```{r}
+regMinCells = names(which(rowSums(binaryRegulonActivity_nonDupl) > minCells))
+regulonSelection[["Regulons active in more than 1% of cells"]] = regMinCells
+length(regMinCells) 
+```
+So: 165 non-duplicated regulons active in > 1% cells
+
+### Regulons correlated with other regulons and active in > 1% cells 
+
+```{r}
+reguCor = cor(t(binaryRegulonActivity_nonDupl[regMinCells,]))
+diag(reguCor) = 0
+nrow(reguCor)
+```
+```{r}
+corrRegs = names(which(rowSums(abs(reguCor) > 0.30) > 0))
+regulonSelection[["Regulons with any other regulon correlated\n with abs(cor)>0.30 \n(and active in at least 1% of cells)"]]  = corrRegs
+length(corrRegs)
+```
+So: 114 regulons correlated with at least one other regulon + active in > 1% cells
+
+### missing regulons: regulons NOT correlated with other regulons or active in < 1% cells ###
+
+```{r}
+missingRegs = rownames(binaryRegulonActivity_nonDupl)[which(!rownames(binaryRegulonActivity_nonDupl) %in% corrRegs)]
+regulonSelection[["Regulons no other regulons correlated\n with abs(cor)>0.30 \n or active in fewer than 1% of cells"]]  = missingRegs
+```
+
+## Create BINARY ACTIVITY HEATMAPS for different selections
+
+Define the colors for each of the cell clusters
+```{r}
+cellInfo = as.data.frame(Idents(seuratObj))
+
+custom_colors = c("slow" = "firebrick",  # Red
+                   "hybrid" = "gold2",  # Green
+                   "fast" = "royalblue1"
+)
+```
+
+```{r, fig.height=30, fig.width=20}
+i = 1
+selRegs = names(regulonSelection)[i]
+binaryMat = binaryRegulonActivity[regulonSelection[[selRegs]],,drop=FALSE]
+NMF::aheatmap(binaryMat, scale="none", revC=TRUE, main=selRegs,
+                  annCol=cellInfo[colnames(binaryMat),, drop=FALSE],
+                  annColors=list(custom_colors),
+                  color = c("white", "firebrick1"))
+pdf(paste0("../plots/coarse_subtypes/binaryRegulonActivity_Heatmap_",i,".pdf"), width = 20, height = 30)  
+NMF::aheatmap(binaryMat, scale="none", revC=TRUE, main=selRegs,
+                  annCol=cellInfo[colnames(binaryMat),, drop=FALSE],
+                  annColors=list(custom_colors),
+                  color = c("white", "firebrick1"))
+dev.off()
+```  
+
+```{r, fig.height=25, fig.width=20}
+i = 2
+selRegs = names(regulonSelection)[i]
+binaryMat = binaryRegulonActivity[regulonSelection[[selRegs]],,drop=FALSE]
+NMF::aheatmap(binaryMat, scale="none", revC=TRUE, main=selRegs,
+                  annCol=cellInfo[colnames(binaryMat),, drop=FALSE],
+                  annColors=list(custom_colors),
+                  color = c("white", "firebrick1"))
+pdf(paste0("../plots/coarse_subtypes/binaryRegulonActivity_Heatmap_",i,".pdf"), width = 20, height = 30)  
+NMF::aheatmap(binaryMat, scale="none", revC=TRUE, main=selRegs,
+                  annCol=cellInfo[colnames(binaryMat),, drop=FALSE],
+                  annColors=list(custom_colors),
+                  color = c("white", "firebrick1"))
+dev.off()
+``` 
+
+```{r, fig.height=20, fig.width=15}
+i = 3
+selRegs = names(regulonSelection)[i]
+binaryMat = binaryRegulonActivity[regulonSelection[[selRegs]],,drop=FALSE]
+NMF::aheatmap(binaryMat, scale="none", revC=TRUE, main=selRegs,
+                  annCol=cellInfo[colnames(binaryMat),, drop=FALSE],
+                  annColors=list(custom_colors),
+                  color = c("white", "firebrick1"))
+pdf(paste0("../plots/coarse_subtypes/binaryRegulonActivity_Heatmap_",i,".pdf"), width = 20, height = 30)  
+NMF::aheatmap(binaryMat, scale="none", revC=TRUE, main=selRegs,
+                  annCol=cellInfo[colnames(binaryMat),, drop=FALSE],
+                  annColors=list(custom_colors),
+                  color = c("white", "firebrick1"))
+dev.off()
+``` 
+```{r, fig.height=10, fig.width=15}
+i = 4
+selRegs = names(regulonSelection)[i]
+binaryMat = binaryRegulonActivity[regulonSelection[[selRegs]],,drop=FALSE]
+NMF::aheatmap(binaryMat, scale="none", revC=TRUE, main=selRegs,
+                  annCol=cellInfo[colnames(binaryMat),, drop=FALSE],
+                  annColors=list(custom_colors),
+                  color = c("white", "firebrick1"))
+pdf(paste0("../plots/coarse_subtypes/binaryRegulonActivity_Heatmap_",i,".pdf"), width = 20, height = 30)  
+NMF::aheatmap(binaryMat, scale="none", revC=TRUE, main=selRegs,
+                  annCol=cellInfo[colnames(binaryMat),, drop=FALSE],
+                  annColors=list(custom_colors),
+                  color = c("white", "firebrick1"))
+dev.off()
+``` 
+
+# CELL-LEVEL ANALYSIS - SCENIC Heatmaps of Scaled Regulon Activity 
+
+```{r, fig.height=25, fig.width=15}
+i = 1
+selRegs = names(regulonSelection)[i]
+AUCMat = AUCdata_scaled[regulonSelection[[selRegs]],,drop=FALSE]
+NMF::aheatmap(AUCMat, scale="none", revC=TRUE, main=selRegs,
+                  annCol=cellInfo[colnames(AUCMat),, drop=FALSE],
+                  annColors=list(custom_colors))
+pdf(paste0("../plots/coarse_subtypes/binaryRegulonActivity_Heatmap_",i,".pdf"), width = 20, height = 30)  
+NMF::aheatmap(AUCMat, scale="none", revC=TRUE, main=selRegs,
+                  annCol=cellInfo[colnames(AUCMat),, drop=FALSE],
+                  annColors=list(custom_colors))
+dev.off()
+```  
+
+```{r, fig.height=20, fig.width=15}
+i = 2
+selRegs = names(regulonSelection)[i]
+AUCMat = AUCdata_scaled[regulonSelection[[selRegs]],,drop=FALSE]
+NMF::aheatmap(AUCMat, scale="none", revC=TRUE, main=selRegs,
+                  annCol=cellInfo[colnames(AUCMat),, drop=FALSE],
+                  annColors=list(custom_colors))
+pdf(paste0("../plots/coarse_subtypes/binaryRegulonActivity_Heatmap_",i,".pdf"), width = 20, height = 30)  
+NMF::aheatmap(AUCMat, scale="none", revC=TRUE, main=selRegs,
+                  annCol=cellInfo[colnames(AUCMat),, drop=FALSE],
+                  annColors=list(custom_colors))
+dev.off()
+``` 
+
+```{r, fig.height=15, fig.width=12}
+i = 3
+selRegs = names(regulonSelection)[i]
+AUCMat = AUCdata_scaled[regulonSelection[[selRegs]],,drop=FALSE]
+NMF::aheatmap(AUCMat, scale="none", revC=TRUE, main=selRegs,
+                  annCol=cellInfo[colnames(AUCMat),, drop=FALSE],
+                  annColors=list(custom_colors))
+pdf(paste0("../plots/coarse_subtypes/binaryRegulonActivity_Heatmap_",i,".pdf"), width = 20, height = 30)  
+NMF::aheatmap(AUCMat, scale="none", revC=TRUE, main=selRegs,
+                  annCol=cellInfo[colnames(AUCMat),, drop=FALSE],
+                  annColors=list(custom_colors))
+dev.off()
+``` 
+
+```{r, fig.height=10, fig.width=10}
+i = 4
+selRegs = names(regulonSelection)[i]
+AUCMat = AUCdata_scaled[regulonSelection[[selRegs]],,drop=FALSE]
+NMF::aheatmap(AUCMat, scale="none", revC=TRUE, main=selRegs,
+                  annCol=cellInfo[colnames(AUCMat),, drop=FALSE],
+                  annColors=list(custom_colors))
+pdf(paste0("../plots/coarse_subtypes/binaryRegulonActivity_Heatmap_",i,".pdf"), width = 20, height = 30)  
+NMF::aheatmap(AUCMat, scale="none", revC=TRUE, main=selRegs,
+                  annCol=cellInfo[colnames(AUCMat),, drop=FALSE],
+                  annColors=list(custom_colors))
+dev.off()
+``` 
+
+# CELL-LEVEL ANALYSIS - Dimensionality Reduced Space for Regulon Activity
+
+Just like we can perform DR on gene expression data, we can perform DR on the activity scores of the regulons
+
+## UMAP
+
+```{r}
+umapAUC = umap::umap(t(AUCdata))
+``` 
+
+```{r}
+umap_dr = as.data.frame(umapAUC$layout)
+umap_dr$cluster =Idents(seuratObj)[rownames(umap_dr)]
+```
+
+```{r}
+ggplot(data = umap_dr, aes(x = V1, y = V2, color = cluster )) + 
+  geom_point() + 
+  theme_bw() + 
+  scale_color_manual(values = custom_colors)
+```
+Intermediate fibers: some have TF activity scores more similar to fast fibers, others more to slow
+
+## PCA
+```{r}
+pcaAUC = prcomp(AUCdata %>% t(), scale. = TRUE, center = TRUE)
+``` 
+
+```{r}
+pca_dr = as.data.frame(pcaAUC$x)
+pca_dr$cluster =Idents(seuratObj)[rownames(pca_dr)]
+```
+
+```{r}
+ggplot(data = pca_dr, aes(x = PC1, y = PC2, color = cluster )) + 
+  geom_point() + 
+  theme_bw() + 
+  scale_color_manual(values = custom_colors)
+```
+
+```{r}
+ggplot(data = pca_dr, aes(x = PC1, y = PC3, color = cluster )) + 
+  geom_point() + 
+  theme_bw() + 
+  scale_color_manual(values = custom_colors)
+```
+```{r}
+ggplot(data = pca_dr, aes(x = PC2, y = PC3, color = cluster )) + 
+  geom_point() + 
+  theme_bw() + 
+  scale_color_manual(values = custom_colors)
+```
+__Fast2: different pattern of TF activity than other Fast fibers, captured by PC1__
+__link PC2 and intermediate fibers?__
+__PC3 splits fast and slow fibers__
+
+Check the loadings associated to each PC to get a glimse of potential TFs per cluster of fibers
+
+```{r}
+# Extract loadings
+loadings = pcaAUC$rotation
+
+# Define function to get top variables for each PC
+get_top_variables = function(loadings, pc, top_n = 10) {
+  # Get absolute loadings for the specified PC
+  abs_loadings = abs(loadings[, pc])
+  # Sort loadings in descending order
+  sorted_loadings = sort(abs_loadings, decreasing = TRUE)
+  # Get top n variables
+  top_variables = names(sorted_loadings)[1:top_n]
+  return(top_variables)
+}
+
+# Get top variables for each PC
+num_pcs = 3
+top_variables_list = lapply(1:num_pcs, function(pc) {
+  get_top_variables(loadings, pc)
+})
+
+# Print top variables for each PC
+for (pc in 1:num_pcs) {
+  cat("PC", pc, ": ", paste(top_variables_list[[pc]], collapse = ", "), "\n")
+}
+```
+# Cluster-level exploration of regulon activities
+
+## Calculage and visualize average and scaled average regulon activity per cluster
+```{r}
+## Average Regulon Activity per cluster 
+cellClusters = seuratObj@meta.data$fiber_type_seurat %>% magrittr::set_names(rownames(seuratObj@meta.data))
+
+# Split the cells by cluster:
+cellsPerCluster = split(names(cellClusters), cellClusters) 
+regulonAUC_all = regulonAUC
+regulonAUC = regulonAUC[onlyNonDuplicatedExtended(rownames(regulonAUC)),]
+# Calculate average regulon activity:
+regulonActivity_byCellType = sapply(cellsPerCluster,
+                                     function(cells) rowMeans(getAUC(regulonAUC)[,cells]))
+# Scale regulon activity:
+regulonActivity_byCellType_Scaled = t(scale(t(regulonActivity_byCellType), center = T, scale=T))
+```
+
+Heatmap
+```{r, fig.height=15, fig.width=5}
+hm = ComplexHeatmap::draw(ComplexHeatmap::Heatmap(regulonActivity_byCellType, name="Raw Regulon activity",column_dend_side = "top", column_title_side = "top", column_names_side = "top", row_names_gp=grid::gpar(fontsize=6), column_names_gp=grid::gpar(fontsize=9))) # row font size
+pdf(paste0("../plots/coarse_subtypes/ClusterRegulonActivity_Heatmap_","Raw",".pdf"), width = 5, height = 15)  
+hm
+dev.off()
+```
+
+```{r, fig.height=15, fig.width=5}
+hm = ComplexHeatmap::draw(ComplexHeatmap::Heatmap(regulonActivity_byCellType_Scaled, name="Scaled Regulon activity",column_dend_side = "top", column_title_side = "top", column_names_side = "top", row_names_gp=grid::gpar(fontsize=6), column_names_gp=grid::gpar(fontsize=9))) # row font size
+pdf(paste0("../plots/coarse_subtypes/ClusterRegulonActivity_Heatmap_","Scaled",".pdf"), width = 5, height = 15)  
+hm
+dev.off()
+```
+
+# Find cell-type specific regulators by use of the "Regulon Specificity Score"
+
+```{r, fig.height=8, fig.width=3}
+rss = calcRSS(AUC=getAUC(regulonAUC), cellAnnotation=cellClusters[colnames(regulonAUC)])
+rss = rss[,levels(Idents(seuratObj))]
+rssPlot = plotRSS(rss, col.mid = "firebrick1", col.high = "firebrick4", zThreshold = 1.25)
+rssPlot
+pdf("../plots/coarse_subtypes/regulon_specificity_scores.pdf", width = 3, height = 8)  
+rssPlot
+dev.off()
+```
+
+```{r}
+SCENIC::plotRSS_oneSet(rss,setName = "fast") 
+SCENIC::plotRSS_oneSet(rss,setName = "hybrid") 
+SCENIC::plotRSS_oneSet(rss,setName = "slow") 
+```
+
+# Custom TF prioritization
+
+In the next code chunks, we will prioritize TFs per cell type by looking at expression and activity of the TFs.
+Main idea here: most important TFs will be those with specific expression in a cluster of interest, and with specfic activity (= enrichment of target genes) in the same cluster.
+
+Get wilcox-test results differential expression of TFs
+```{r}
+TFs = gsub("\\(\\+\\)","",rownames(rss))
+```
+
+```{r}
+TFs_DE = FindAllMarkers(seuratObj, min.pct = 0, logfc.threshold = 0, min.diff.pct = 0, return.thresh = 1) %>% as_tibble() %>% filter(gene %in% TFs)
+TFs_DE %>% arrange(-avg_log2FC)
+TFs_DE = TFs_DE %>% mutate(score = -log10(p_val_adj+0.05) *(pct.1+0.1)/(pct.2+0.1)*avg_log2FC) %>% arrange(-score) 
+TFs_DE$gene %>% unique() %>% setdiff(TFs)
+```
+Get wilcox-test results differential regulaton activity of TFs
+
+"Log fold change in AUC score - fraction of activity based on AUC-binary score"
+```{r}
+AUC_object = seuratObj
+AUC_object[['AUC']] = CreateAssayObject(data = AUCdata[rownames(binaryRegulonActivity),])
+AUC_object[['AUCBinary']] = CreateAssayObject(data = binaryRegulonActivity)
+
+DefaultAssay(AUC_object) = 'AUC'
+TFs_AUC = FindAllMarkers(AUC_object, min.pct = 0, logfc.threshold = 0, min.diff.pct = 0, return.thresh = 1) %>% as_tibble() %>% mutate(gene = gsub("\\(\\+\\)","",gene))
+
+DefaultAssay(AUC_object) = 'AUCBinary'
+TFs_AUCBinary = FindAllMarkers(AUC_object, min.pct = 0, logfc.threshold = 0, min.diff.pct = 0, return.thresh = 1) %>% as_tibble() %>% mutate(gene = gsub("\\(\\+\\)","",gene))
+
+TFs_AUC = TFs_AUC %>% select(avg_log2FC, p_val_adj, cluster, gene) %>% 
+  inner_join(
+    TFs_AUCBinary %>% select(pct.1, pct.2, cluster, gene)
+    )
+
+TFs_AUC = TFs_AUC %>% mutate(score = -log10(p_val_adj+0.05) *(pct.1+0.1)/(pct.2+0.1)*avg_log2FC) %>% arrange(-score)
+```
+How well does this custom activity score accord to the RSS score:
+```{r}
+rss_df = rss %>% data.frame() %>% rownames_to_column("TF") %>% as_tibble() %>% mutate(TF = gsub("\\(\\+\\)","",TF)) %>% gather(cluster, RSS, -TF) %>% arrange(-RSS)
+```
+
+```{r}
+rss_df %>% inner_join(TFs_AUC %>% rename(TF = gene)) %>% ggplot(aes(RSS, score)) + geom_point() + facet_wrap("cluster") + theme_bw()
+rss_df %>% inner_join(TFs_AUC %>% rename(TF = gene)) %>% ggplot(aes(RSS, log(score))) + geom_point() + facet_wrap("cluster") + theme_bw()
+```
+
+In general: higher RSS scores accord to higher custom wilcox-based scores. Continue only with RSS score because that's a published/accepted score
+
+Now: create table combining the expression-based differential TF score with the activity  RSSscore:
+```{r}
+priortization_df = TFs_DE %>% rename(TF = gene, DE_score = score) %>% select(cluster, TF, DE_score) %>% inner_join(rss_df)
+
+priortization_df_scaledAll = priortization_df %>% mutate(DE_score_scaled = nichenetr::scaling_zscore(DE_score), RSS_score_scaled = nichenetr::scaling_zscore(RSS)) %>% mutate(prioritization_score = DE_score_scaled + RSS_score_scaled) %>% arrange(-prioritization_score)
+
+priortization_df_scaledPerCluster = priortization_df %>% group_by(cluster)  %>% mutate(DE_score_scaled = nichenetr::scaling_zscore(DE_score), RSS_score_scaled = nichenetr::scaling_zscore(RSS)) %>% mutate(prioritization_score = DE_score_scaled + RSS_score_scaled) %>% arrange(-prioritization_score)
+
+priortization_df_scaledAll %>% ggplot(aes(RSS, DE_score, color = prioritization_score)) + 
+  geom_point() + 
+  scale_color_viridis_c() +
+  facet_wrap("cluster") + 
+  theme_bw() + ggtitle("Scores scaled overall")
+priortization_df_scaledPerCluster %>% ggplot(aes(RSS, DE_score, color = prioritization_score)) + 
+  geom_point() + 
+  scale_color_viridis_c() +
+  facet_wrap("cluster") + 
+  theme_bw() + ggtitle("Scores scaled Per Cluster")
+```
+
+```{r}
+priortization_df_scaledAll %>% filter(DE_score_scaled > 1 & RSS_score_scaled > 1) %>% group_by(cluster) %>% count()
+priortization_df_scaledAll %>% filter(DE_score_scaled > 1 & RSS_score_scaled > 1) %>% arrange(cluster, -prioritization_score)
+```
+
+```{r}
+priortization_df_scaledPerCluster %>% filter(DE_score_scaled > 1 & RSS_score_scaled > 1) %>% group_by(cluster) %>% count()
+priortization_df_scaledPerCluster %>% filter(DE_score_scaled > 1 & RSS_score_scaled > 1) %>% arrange(cluster, -prioritization_score)
+
+unique_prioritized_df = priortization_df_scaledAll %>% group_by(TF) %>% top_n(1, prioritization_score) %>% select(TF, cluster) %>% ungroup() %>% inner_join(priortization_df_scaledPerCluster)
+
+prioritized_cluster_list = split(unique_prioritized_df  %>% filter(DE_score_scaled > 1 & RSS_score_scaled > 1) %>% .$TF, unique_prioritized_df %>% filter(DE_score_scaled > 1 & RSS_score_scaled > 1) %>% .$cluster)
+print(prioritized_cluster_list)
+```
+
+```{r}
+priortization_df_scaledAll %>% ungroup() %>% arrange(cluster, -prioritization_score) %>% xlsx::write.xlsx2("../output/priortization_df_COARSE.xlsx", sheetName = "scaledAll", append = FALSE)
+priortization_df_scaledPerCluster %>% ungroup() %>% arrange(cluster, -prioritization_score) %>% xlsx::write.xlsx2("../output/priortization_df_COARSE.xlsx", sheetName = "scaledPerCluster", append = TRUE)
+
+priortization_df_scaledAll %>% group_by(TF) %>% top_n(1, prioritization_score) %>% select(TF, cluster) %>% ungroup() %>% inner_join(priortization_df_scaledAll)  %>% arrange(cluster, -prioritization_score)  %>% xlsx::write.xlsx2("../output/priortization_df_COARSE.xlsx", sheetName = "top1TF_scaledAll", append = TRUE)
+```
+# Expression-Activity visualization of prioritized TFs
+
+Create comprehensive table with useful information wrt expression and activity per TF per cluster
+```{r}
+cell_activity = AUCdata  %>% t() %>% as.data.frame() %>% rownames_to_column("cell") %>% as_tibble()  %>% gather(TF, activity, -cell) %>% mutate(TF = gsub("\\(\\+\\)","",TF))
+    
+cell_activity_scaled = AUCdata_scaled  %>% t() %>% as.data.frame() %>% rownames_to_column("cell") %>% as_tibble()  %>% gather(TF, activity_scaled, -cell) %>% mutate(TF = gsub("\\(\\+\\)","",TF))
+  
+cell_activity_binary = binaryRegulonActivity  %>% t() %>% as.data.frame() %>% rownames_to_column("cell") %>% as_tibble()  %>% gather(TF, binary_activity, -cell) %>% mutate(TF = gsub("\\(\\+\\)","",TF))
+    
+cell_expression = seuratObj@assays$RNA@data %>% .[TFs,] %>% t() %>% as.data.frame() %>% rownames_to_column("cell") %>% as_tibble()  %>% gather(TF, expression, -cell)
+  
+cell_expression_scaled = seuratObj@assays$RNA@scale.data %>% .[TFs,] %>% t() %>% as.data.frame() %>% rownames_to_column("cell") %>% as_tibble()  %>% gather(TF, expression_scaled, -cell)
+  
+cell_cluster = tibble(cell = names(cellClusters), cluster = cellClusters) %>% mutate(cluster = factor(cluster, levels = levels(Idents(seuratObj))))
+      
+regulon_nTargets = tibble(
+    TF = names(regulons),
+    nr_targets = sapply(regulons, length)
+  )  %>% mutate(TF = gsub("\\(\\+\\)","",TF))
+  
+combined_df_cell = cell_cluster %>% inner_join(cell_activity) %>% inner_join(cell_activity_scaled) %>% inner_join(cell_activity_binary)  %>% inner_join(cell_expression) %>% inner_join(cell_expression_scaled) %>% inner_join(regulon_nTargets) %>% arrange(cluster, cell, TF)
+  
+combined_df_cell = combined_df_cell %>% inner_join(priortization_df_scaledAll %>% select(cluster, TF, prioritization_score))
+  combined_df = combined_df_cell %>% group_by(cluster, TF) %>% select(-cell) %>% summarise_all(mean)
+  
+combined_df = combined_df %>% mutate(TF_target = paste0(TF,"\n", "nr_targets: ",nr_targets)) 
+
+print(head(combined_df_cell)) # per cell
+print(head(combined_df)) # average per cluster
+```
+
+Create the overview TF-cluster visualization
+```{r}
+visualize_TF_expression_activity_bubble = function(TFs_oi, combined_df){
+  levels = combined_df$TF_target %>% magrittr::set_names(combined_df$TF) %>% .[rev(TFs_oi)]
+  
+  p1 = combined_df %>% filter(TF %in% TFs_oi) %>% mutate(TF_target = factor(TF_target, levels = levels)) %>% 
+    ggplot(aes(x = cluster, y = TF_target, color = activity, size = binary_activity)) + 
+    geom_point() + 
+    theme_bw() + 
+    scale_color_viridis_c() + 
+    ggtitle("Activity_vs_fracBinary") + xlab("") + ylab("")
+  
+  p2 = combined_df %>% filter(TF %in% TFs_oi) %>% mutate(TF_target = factor(TF_target, levels = levels)) %>% 
+    ggplot(aes(x = cluster, y = TF_target, color = activity_scaled, size = binary_activity)) + 
+    geom_point() + 
+    theme_bw() + 
+    scale_color_viridis_c() + 
+    ggtitle("ScaledActivity_vs_fracBinary") + xlab("") + ylab("")
+  
+  p3 = combined_df %>% filter(TF %in% TFs_oi) %>% mutate(TF_target = factor(TF_target, levels = levels)) %>% 
+    ggplot(aes(x = cluster, y = TF_target, color = expression_scaled, size = expression)) + 
+    geom_point() + 
+    theme_bw() + 
+    scale_color_viridis_c() + 
+    ggtitle("ScaledExpression_vs_Expression") + xlab("") + ylab("")
+  
+  p4 = combined_df %>% filter(TF %in% TFs_oi) %>% mutate(TF_target = factor(TF_target, levels = levels)) %>% 
+    ggplot(aes(x = cluster, y = TF_target, color = expression_scaled, size = binary_activity)) + 
+    geom_point() + 
+    theme_bw() + 
+    scale_color_viridis_c() + 
+    ggtitle("ScaledExpression_vs_fracBinary") + xlab("") + ylab("")
+  
+  p = patchwork::wrap_plots(p1, p2, p3, p4, ncol = 2) 
+
+}
+```
+
+Now do this for all clusters: with the prioritization as defined before
+
+```{r}
+list_plots = names(prioritized_cluster_list) %>% lapply(function(cluster_oi, prioritized_cluster_list, combined_df){
+  TFs_oi = prioritized_cluster_list[[cluster_oi]]
+  plot = visualize_TF_expression_activity_bubble(TFs_oi, combined_df)
+  return(plot)
+  }, prioritized_cluster_list, combined_df)
+names(list_plots) = names(prioritized_cluster_list)
+```
+
+Show these plots here only for the top prioritized TF
+```{r, fig.width=15, fig.height=7}
+list_plots$fast
+```
+
+```{r, fig.width=15, fig.height=7}
+list_plots$hybrid
+```
+
+```{r, fig.width=15, fig.height=7}
+list_plots$slow
+```
+
+Now do this for all clusters: top10 TFs per cluster, based on activity (= regulon specificity score)
+
+```{r}
+prioritized_df_top10 = priortization_df_scaledAll %>% group_by(cluster) %>% top_n(10, RSS)  %>% arrange(-RSS)
+
+prioritized_cluster_list = split(prioritized_df_top10$TF, prioritized_df_top10$cluster)
+print(prioritized_cluster_list)
+```
+
+```{r}
+list_plots = names(prioritized_cluster_list) %>% lapply(function(cluster_oi, prioritized_cluster_list, combined_df){
+  TFs_oi = prioritized_cluster_list[[cluster_oi]]
+  plot = visualize_TF_expression_activity_bubble(TFs_oi, combined_df)
+  return(plot)
+  }, prioritized_cluster_list, combined_df)
+names(list_plots) = names(prioritized_cluster_list)
+```
+
+Show these plots here only for the top prioritized TF
+```{r, fig.width=15, fig.height=10}
+print(list_plots)
+```
+
+Now do this for all clusters: top10 TFs per cluster based activity+expression combined prioritization score
+
+```{r}
+prioritized_df_top10 = priortization_df_scaledAll %>% group_by(cluster) %>% top_n(10, prioritization_score)  %>% arrange(-prioritization_score)
+
+prioritized_cluster_list = split(prioritized_df_top10$TF, prioritized_df_top10$cluster)
+print(prioritized_cluster_list)
+```
+
+```{r}
+list_plots = names(prioritized_cluster_list) %>% lapply(function(cluster_oi, prioritized_cluster_list, combined_df){
+  TFs_oi = prioritized_cluster_list[[cluster_oi]]
+  plot = visualize_TF_expression_activity_bubble(TFs_oi, combined_df)
+  return(plot)
+  }, prioritized_cluster_list, combined_df)
+names(list_plots) = names(prioritized_cluster_list)
+```
+
+Show these plots here only for the top prioritized TF
+```{r, fig.width=15, fig.height=10}
+print(list_plots)
+```
+
+```{r}
+for(i in seq_len(length(names(prioritized_cluster_list)))){
+  cluster_oi = names(prioritized_cluster_list)[i]
+  list_plots_cluster_oi = list_plots[[cluster_oi]]
+  pdf(paste0("../plots/coarse_subtypes/TF_vs_cluster/",cluster_oi,".pdf"), width = 15, height = 10)  
+  print(list_plots_cluster_oi)
+  dev.off()
+  }
+```
+
+# Violin and FeaturePlot Combined visualizations of TF expression and activity for prioritized TFs
+
+```{r}
+visualize_TF_expression_activity = function(TF_oi, AUCdata, binaryRegulonActivity, dimred){
+  regulon = paste0(TF_oi, "(+)")
+  cell_dim = dimred %>% as.data.frame() %>% rownames_to_column("cell") %>% as_tibble()
+  cell_activity = AUCdata[regulon,] %>% as.data.frame() %>% rownames_to_column("cell") %>% as_tibble() %>% magrittr::set_colnames(c("cell","activity"))
+  
+  cell_activity_binary = binaryRegulonActivity[regulon, ] %>% as.data.frame() %>% rownames_to_column("cell") %>% as_tibble() %>% magrittr::set_colnames(c("cell","binary_activity"))
+  
+  cell_expression = tibble(cell = names(seuratObj@assays$RNA@data %>% .[TF_oi,]), expression = seuratObj@assays$RNA@data %>% .[TF_oi,])
+  cell_cluster = tibble(cell = names(cellClusters), cluster = cellClusters) %>% mutate(cluster = factor(cluster, levels = levels(Idents(seuratObj))))
+    
+  combined_df = cell_dim %>% inner_join(cell_activity) %>% inner_join(cell_activity_binary)  %>% inner_join(cell_expression) %>% inner_join(cell_cluster)
+  
+  p_dimplot = combined_df %>% ggplot() +
+    geom_point(aes(dim1, dim2, color = cluster), size = 1.1) + theme_bw() +
+    scale_color_manual(values = custom_colors) + ggtitle(TF_oi)
+  
+  p1 = combined_df %>% ggplot() +
+    geom_point(aes(dim1, dim2, color = expression), size = 1.1) + theme_bw() + scale_color_viridis_c()
+  p2 = combined_df %>% ggplot() +
+    geom_point(aes(dim1, dim2, color = activity), size = 1.1) + theme_bw() + scale_color_gradient(low = "grey95", high = "firebrick1")
+  
+    p3 = combined_df %>% ggplot() +
+    geom_point(aes(dim1, dim2, color = binary_activity), size = 1.1) + theme_bw() + scale_color_gradient(low = "grey95", high = "firebrick1")
+  
+  DR_FeaturePlot = patchwork::wrap_plots(p_dimplot, p1, p2, p3, ncol = 2) 
+  
+  
+  # Assuming your data frame is called df
+  p1 = combined_df %>% ggplot(aes(x = cluster, y = expression, color = cluster)) +
+    geom_violin(aes(fill = cluster), trim = TRUE, alpha = 0.05, ) +
+    #geom_jitter(width = 0.2) +
+    geom_beeswarm(data = combined_df %>% filter(expression > 0),  cex = 1, alpha = 0.5) +
+    scale_color_manual(values = custom_colors) + 
+    scale_fill_manual(values = custom_colors) + 
+    theme_bw() +
+    labs(x = "Cluster", y = "Expression")  + ggtitle(TF_oi)
+  p2 = combined_df %>% ggplot(aes(x = cluster, y = activity, color = cluster)) +
+    geom_violin(aes(fill = cluster), trim = TRUE, alpha = 0.05, ) +
+    #geom_jitter(width = 0.2) +
+    geom_beeswarm(data = combined_df %>% filter(activity > 0), cex = 1, alpha = 0.5) +
+    scale_color_manual(values = custom_colors) + 
+    scale_fill_manual(values = custom_colors) + 
+    theme_bw() +
+    labs(x = "Cluster", y = "Activity")
+  ViolinPlot = patchwork::wrap_plots(p1, p2, ncol = 1) 
+  return(list(DR_FeaturePlot = DR_FeaturePlot, ViolinPlot = ViolinPlot))
+}
+```
+
+Create these plots for the most strongly prioritized TF per cluster
+
+```{r}
+list_plots = names(prioritized_cluster_list) %>% lapply(function(cluster_oi, prioritized_cluster_list, AUCdata, binaryRegulonActivity, dimred){
+  TFs_oi = prioritized_cluster_list[[cluster_oi]]
+  list_plots = TFs_oi %>% lapply(visualize_TF_expression_activity, AUCdata, binaryRegulonActivity, dimred)
+  names(list_plots) = TFs_oi
+  return(list_plots)
+  }, prioritized_cluster_list, AUCdata, binaryRegulonActivity, dimred)
+names(list_plots) = names(prioritized_cluster_list)
+```
+
+Show these plots here only for the top prioritized TF
+```{r, fig.width=6, fig.height=6}
+for(i in seq_len(length(names(prioritized_cluster_list)))){
+  cluster_oi = names(prioritized_cluster_list)[i]
+  list_plots_cluster_oi = list_plots[[cluster_oi]][1]
+  for(i in seq_len(length(names(list_plots_cluster_oi)))){
+    TF_oi = names(list_plots_cluster_oi)[i]
+    plots_TFs_oi = list_plots_cluster_oi[[TF_oi]]
+    plot = plots_TFs_oi %>% .$ViolinPlot
+    print(plot)
+  }
+}
+```
+
+```{r, fig.width=8, fig.height=6}
+for(i in seq_len(length(names(prioritized_cluster_list)))){
+  cluster_oi = names(prioritized_cluster_list)[i]
+  list_plots_cluster_oi = list_plots[[cluster_oi]][1]
+  for(i in seq_len(length(names(list_plots_cluster_oi)))){
+    TF_oi = names(list_plots_cluster_oi)[i]
+    plots_TFs_oi = list_plots_cluster_oi[[TF_oi]]
+    plot = plots_TFs_oi %>% .$DR_FeaturePlot
+    print(plot)
+  }
+}
+```
+
+Save now the plots for all prioritized TFs from code chunk above:
+```{r}
+for(i in seq_len(length(names(prioritized_cluster_list)))){
+  cluster_oi = names(prioritized_cluster_list)[i]
+  list_plots_cluster_oi = list_plots[[cluster_oi]]
+  for(i in seq_len(length(names(list_plots_cluster_oi)))){
+    TF_oi = names(list_plots_cluster_oi)[i]
+    plots_TFs_oi = list_plots_cluster_oi[[TF_oi]]
+    plot = plots_TFs_oi %>% .$ViolinPlot
+    pdf(paste0("../plots/coarse_subtypes/ViolinPlots_expr_act_TF/",cluster_oi, "_",TF_oi,".pdf"), width = 6, height = 6)  
+    print(plot)
+    dev.off()
+
+    plot = plots_TFs_oi %>% .$DR_FeaturePlot
+    pdf(paste0("../plots/coarse_subtypes/FeaturePlots_expr_act_TF/",cluster_oi, "_", TF_oi,".pdf"), width = 8, height = 6)  
+    print(plot)
+    dev.off()
+
+  }
+}
+```
+
+# Target gene visualization of regulons of interest
+
+```{r}
+regulon = "MAFA(+)"
+target_genes = regulons[[regulon]]
+print(target_genes)
+```
+
+```{r}
+Seurat::DoHeatmap(seuratObj, features = target_genes, group.by = "fiber_type_seurat", group.bar = T, group.colors = custom_colors, slot = "data") + ggtitle("Unscaled data")
+Seurat::DoHeatmap(seuratObj, features = target_genes, group.by = "fiber_type_seurat", group.bar = T, group.colors = custom_colors, slot = "scale.data") + ggtitle("Scaled data")
+```
