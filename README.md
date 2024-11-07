@@ -1,31 +1,19 @@
-TODO: Add more to the title of your project here
+# Human Skeletal Muscle Fiber Heterogeneity Beyond 1 Myosin Heavy Chains
 
-# human_skeletal_muscle_fiber_heterogeneity_beyond_myosin_heavy_chains:
-
-TODO: Give a brief description of what your project is about
-
-This project...
+Github repository with all code used for this manuscript (provide link once available). 
+The repo is maintained my Thibaux Van der Stede, Ben Stocks and Roger Moreno-Justicia.
 
 # Brief description of folder and file contents
 
-TODO: As project evolves, add brief description of what is inside the data, doc and R folders.
-
 The following folders contain:
-
-- `data/`:
-- `doc/`:
-- `R/`:
+- `data-raw`: Source of raw data, shouldn't be modified during the analysis.
+- `data/`: Contains datasets generated during the analysis, many times products of the analysis will be saved to this folder and then loaded in subsequent scripts.
+- `doc/`: Here, all figures and plots are saved after the analysis
+- `R/`: Contains all scripts used during the analysis. 
 
 # Installing project R package dependencies
 
-If dependencies have been managed by using `usethis::use_package("packagename")`
-through the `DESCRIPTION` file, installing dependencies is as easy as opening the
-`human_skeletal_muscle_fiber_heterogeneity_beyond_myosin_heavy_chains.Rproj` file and running this command in the console:
-
-    # install.packages("remotes")
-    remotes::install_deps()
-
-You'll need to have remotes installed for this to work.
+At the moment there is no formal package dependency management although it will be incorporated in the future.
 
 # Resource
 
