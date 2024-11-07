@@ -143,7 +143,7 @@ Seurat::DimPlot(seurat_by_subject,
                        labels=c("40", "20", "0", "-20")
     )
 
-ggplot2::ggsave(here::here("doc/figures/figure_2/figure_2_S2A.png"),
+ggplot2::ggsave(here::here("doc/figures/figure_2_S2/figure_2_S2A.png"),
                 units = "mm",
                 height = 60,
                 width = 90)
@@ -174,7 +174,7 @@ Seurat::DimPlot(seurat_by_subject,
                        labels=c("40", "20", "0", "-20")
     )
 
-ggplot2::ggsave(here::here("doc/figures/figure_2/figure_2_S2B.png"),
+ggplot2::ggsave(here::here("doc/figures/figure_2_S2/figure_2_S2B.png"),
                 units = "mm",
                 height = 60,
                 width = 90)
@@ -237,7 +237,7 @@ data_pca_P |>
                        name = "")
 
 
-ggplot2::ggsave(here::here("doc/figures/figure_2/figure_2_S2C.png"),
+ggplot2::ggsave(here::here("doc/figures/figure_2_S2/figure_2_S2C.png"),
                 units = "mm",
                 height = 60,
                 width = 90)
@@ -286,7 +286,7 @@ ggplot(PC_df, aes(PC_score, fct_reorder(gene, No))) +
         axis.title.y = element_blank()
     )
 
-ggplot2::ggsave(here::here("doc/figures/figure_2/figure_2_S2D.png"),
+ggplot2::ggsave(here::here("doc/figures/figure_2_S2/figure_2_S2D.png"),
                 units = "mm",
                 height = 60,
                 width = 90)
@@ -369,7 +369,7 @@ ggplot2::ggplot(PC_df,
         # panel.grid.minor = element_blank()
     )
 
-ggplot2::ggsave(here::here("doc/figures/figure_2/figure_2_S2E.png"),
+ggplot2::ggsave(here::here("doc/figures/figure_2_S2/figure_2_S2E.png"),
                 units = "mm",
                 height = 60,
                 width = 90)

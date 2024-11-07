@@ -30,7 +30,7 @@ proteomics <- proteomics %>%
     tibble::column_to_rownames("Gene_name")
 
 ################################################################################################################################################
-#############################################@####       EXTRACT GENES      ####################################################################
+#############################################@####       Panel B      ####################################################################
 ################################################################################################################################################
 
 
@@ -71,9 +71,7 @@ counts_ft <- counts_ft %>%
     ))
 
 
-################################################################################################################################################
-#############################      CALCULATE PERCENTAGE UMI counts_transcriptomics FOR EACH GENE COMBINATION    ################################################
-################################################################################################################################################
+# CALCULATE PERCENTAGE UMI counts_transcriptomics FOR EACH GENE COMBINATION
 
 # MYH -------------------------------------------------------
 
@@ -117,10 +115,7 @@ counts_ft <- counts_ft %>%
     dplyr::mutate("order_MYH2_slowfast" = seq_len(nrow(counts_ft)))
 
 
-################################################################################################################################################
-#############################      CALCULATE PERCENTAGE MYH isofroms proteomics    ################################################
-################################################################################################################################################
-
+# CALCULATE PERCENTAGE MYH isofroms proteomics
 # Selecting only MYH
 proteomics_ft <- proteomics |>
     t() |>
@@ -167,10 +162,7 @@ proteomics_ft <- proteomics_ft %>%
     dplyr::mutate("order_MYH1" = seq_len(nrow(proteomics_ft)))
 
 
-################################################################################################################################################
-################################################      CHECK CURVES AS QC: Tx    ###################################################################
-################################################################################################################################################
-
+# CHECK CURVES AS QC: Tx
 
 # MYH7 --------------------------------------------------------------------
 counts_ft %>%
@@ -212,11 +204,7 @@ counts_ft %>%
     ggplot2::theme_minimal() +
     ggtitle("MYH1")
 
-
-################################################################################################################################################
-################################################      FINDING BOTTOM KNEE     ##################################################################
-################################################################################################################################################
-
+# FINDING BOTTOM KNEE
 # Function detects top knee, so we take inverse for bottom knee --> used as threshold
 
 # MYH7 --------------------------------------------------------------------
@@ -294,10 +282,7 @@ counts_ft %>%
     annotate("text", x=50, y=(bottom_knee_MYH1+3), label= "10%", colour="black", fontface=2)
 
 
-################################################################################################################################################
-##################################################     BOTTOM KNEE PROTEOMICS     ##################################################################
-################################################################################################################################################
-
+# BOTTOM KNEE PROTEOMICS
 # Replace NA by 0
 proteomics_ft <- proteomics_ft %>% tidyr::replace_na(list(
     "MYH7_fraction" = 0,
@@ -411,7 +396,7 @@ MYH7_TvsP <- ggplot() +
         legend.position = "none",
     )
 
-ggsave(MYH7_TvsP, filename = here::here("doc/figures/figure_1/threshold_MYH7.png"), width = 40, height = 40, units="mm")
+ggsave(MYH7_TvsP, filename = here::here("doc/figures/figure_1/figure_1B.png"), width = 40, height = 40, units="mm")
 
 
 # MYH2 --------------------------------------------------------------------
@@ -443,7 +428,7 @@ MYH2_TvsP <- ggplot() +
         legend.position = "none",
     )
 
-ggsave(MYH2_TvsP, filename = here::here("doc/figures/figure_1/threshold_MYH2.png"), width = 40, height = 40, units="mm")
+ggsave(MYH2_TvsP, filename = here::here("doc/figures/figure_1/figure_1C.png"), width = 40, height = 40, units="mm")
 
 # MYH1 --------------------------------------------------------------------
 MYH1_TvsP <- ggplot() +
@@ -474,7 +459,7 @@ MYH1_TvsP <- ggplot() +
         legend.position = "none",
     )
 
-ggsave(MYH1_TvsP, filename = here::here("doc/figures/figure_1/threshold_MYH1.png"), width = 40, height = 40, units="mm")
+ggsave(MYH1_TvsP, filename = here::here("doc/figures/figure_1/figure_1D.png"), width = 40, height = 40, units="mm")
 
 
 # Assign fiber types
@@ -591,11 +576,7 @@ data_fiber_typing |>
     ggplot2::theme_minimal()
 
 
-# Ben and I double checked Marta Murgia's paper on SMF proteomics
-# and saw that her curve figure is made using percentages
-# of MYH intensities, instead of raw intensities.
-# Here, we will do the same, calculate percentage
-# of MYH composition and rank fibers before plotting them:
+# calculate percentage of MYH composition and rank fibers before plotting them:
 
 sum_of_intensities <- proteomics_MYH_filtered |>
     t() |>
@@ -1093,7 +1074,7 @@ order_matrix |>
     ggplot2::theme(axis.title = ggplot2::element_text(size = 7))
 
 ggplot2::ggsave(
-    here::here("doc/figures/figure_1/fiber_type_curves_proteomics.png"),
+    here::here("doc/figures/figure_1/figure_1F.png"),
     device = "png",
     width = 128,
     height = 60,
@@ -1131,10 +1112,7 @@ library(grid)
 # Read fiber type file --------------------------------------------------------------
 counts_ft <- read_csv(file=here::here("data/counts_ft.csv"))
 
-################################################################################################################################################
-############################################       MAIN FIGURE: MYH RATIO'S     ####@###########################################################
-################################################################################################################################################
-
+# MAIN FIGURE: MYH RATIO'S
 # Check number of fibers for each type
 counts_ft %>% dplyr::filter(fiber_type_MYH == "Type 1") %>% nrow() # 324
 counts_ft %>% dplyr::filter(fiber_type_MYH == "Hybrid 1/2X") %>% nrow() # 1
@@ -1365,7 +1343,7 @@ plot_MYH_v2 <- order_matrix |>
     scale_x_continuous(limits = c(0,925), expand = c(0, 0)) +
     scale_y_continuous(expand = c(0, 0), breaks = c(0, 25, 50, 75, 100), labels = c("0", "25", "50", "75", "100"))
 
-ggsave(plot_MYH_v2, filename = here::here("doc/figures/figure_1/MYH_curves_transcriptomics.png"), width = 128, height = 60, units="mm")
+ggsave(plot_MYH_v2, filename = here::here("doc/figures/figure_1/figure_1E.png"), width = 128, height = 60, units="mm")
 
 
 # UMAPS -------------------------------------------------------------------
@@ -1485,7 +1463,7 @@ Seurat::DimPlot(filtered_normalized_fibertype_reclustered_seurat_wo_MSTRG_rest,
     )
 
 ggplot2::ggsave(
-here::here("doc/figures/figure_1/UMAP_transcriptomics_fiber_type.png"),
+here::here("doc/figures/figure_1/figure_1G.png"),
 height = 60,
 width = 70,
 units = "mm"
@@ -1523,12 +1501,12 @@ Seurat::DimPlot(
         legend.position = "none"
     )
 
-# ggplot2::ggsave(
-#     here::here("doc/figures/figure_1/UMAP_proteomics_fiber_type.png"),
-#     height = 55,
-#     width = 65,
-#     units = "mm"
-# )
+ggplot2::ggsave(
+    here::here("doc/figures/figure_1/figure_1H.png"),
+    height = 55,
+    width = 65,
+    units = "mm"
+)
 
 ################################################################################################################################################
 #################################################     Panel I  ##############################################################
@@ -1611,7 +1589,7 @@ ggpubr::ggarrange(feature_plot_transcriptomics_MYH7,
                                            face = "bold"),
     )
 
-ggplot2::ggsave(here::here("doc/figures/figure_1/feature_plot_MYHs_transcriptomics.png"),
+ggplot2::ggsave(here::here("doc/figures/figure_1/figure_1I.png"),
                 width = 100,
                 height = 33,
                 units = "mm")
@@ -1696,7 +1674,7 @@ feature_plot <- ggpubr::ggarrange(feature_plot_MYH7,
                                            face = "bold"),
     )
 
-ggplot2::ggsave(here::here("doc/figures/umaps_now_in_fig1/feature_plot_MYHs.png"),
+ggplot2::ggsave(here::here("doc/figures/figure_1J.png"),
                 width = 100,
                 height = 33,
                 units = "mm")

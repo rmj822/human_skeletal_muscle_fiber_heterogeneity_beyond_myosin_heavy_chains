@@ -12,7 +12,7 @@ library(viridis)
 ################################################################################################################################################
 
 # Load result files with all genes
-DEG <- read.csv ("~/single_fiber_heterogeneity/data/DESeq2_pseudobulk_transcriptomics_slow_vs_fast/slow_vs_fast.csv", header = T) %>%
+DEG <- read.csv(here::here("data/figure_4/slow_vs_fast_transcriptomics.csv", header = T)) %>%
     drop_na(GENEID) %>%
     drop_na(padj)
 
@@ -168,6 +168,396 @@ ggplot2::ggsave(here::here("doc/figures/figure_4/figure_4A_inlay.png"),
 ########################################################       FIGURE 4B     ###################################################################
 ################################################################################################################################################
 
+library(eulerr)
+library(tidyverse)
+library(ggplot2)
+
+# Loading seurat clusters and merging fast and slow -----------------------
+
+metadata <-
+    vroom::vroom(here::here("data/metadata_proteomics_seurat_clusters.csv")) |>
+    dplyr::rename(
+        "fiber_type_seurat" = "seurat_clusters"
+    )
+
+proteomics_data <-vroom::vroom(here::here("data/data_proteomics_filtered.csv")) |>
+    dplyr::select(!1) |>
+    tibble::column_to_rownames("Gene.name") |>
+    log2() |>
+    as.data.frame()
+
+pseudobulk_maker <- function(.data, metadata, subject_id, grouping, colname) {
+    selection_vector <- metadata |>
+        dplyr::filter(fiber_type_seurat == grouping) |>
+        dplyr::filter(subject == subject_id) |>
+        dplyr::pull("fiberID")
+
+    pseudobulk_median_calculation <- .data |>
+        as.data.frame() |>
+        dplyr::select(selection_vector) |>
+        t() |>
+        as.data.frame() |>
+        dplyr::mutate(dplyr::across(.cols = everything(), median, na.rm = T)) |>
+        unique() |>
+        t()
+
+    colnames(pseudobulk_median_calculation) <- colname
+    return(pseudobulk_median_calculation)
+}
+
+data_pseudobulk <- data.frame(
+    pseudobulk_maker(
+        .data = as.data.frame(proteomics_data),
+        metadata = metadata,
+        subject_id = "P1",
+        grouping = "slow",
+        colname = "P1_slow"
+    ),
+    pseudobulk_maker(
+        .data = as.data.frame(proteomics_data),
+        metadata = metadata,
+        subject_id = "P2",
+        grouping = "slow",
+        colname = "P2_slow"
+    ),
+    pseudobulk_maker(
+        .data = as.data.frame(proteomics_data),
+        metadata = metadata,
+        subject_id = "P3",
+        grouping = "slow",
+        colname = "P3_slow"
+    ),
+    pseudobulk_maker(
+        .data = as.data.frame(proteomics_data),
+        metadata = metadata,
+        subject_id = "P4",
+        grouping = "slow",
+        colname = "P4_slow"
+    ),
+    pseudobulk_maker(
+        .data = as.data.frame(proteomics_data),
+        metadata = metadata,
+        subject_id = "P5",
+        grouping = "slow",
+        colname = "P5_slow"
+    ),
+    pseudobulk_maker(
+        .data = as.data.frame(proteomics_data),
+        metadata = metadata,
+        subject_id = "P1",
+        grouping = "fast",
+        colname = "P1_fast"
+    ),
+    pseudobulk_maker(
+        .data = as.data.frame(proteomics_data),
+        metadata = metadata,
+        subject_id = "P2",
+        grouping = "fast",
+        colname = "P2_fast"
+    ),
+    pseudobulk_maker(
+        .data = as.data.frame(proteomics_data),
+        metadata = metadata,
+        subject_id = "P3",
+        grouping = "fast",
+        colname = "P3_fast"
+    ),
+    pseudobulk_maker(
+        .data = as.data.frame(proteomics_data),
+        metadata = metadata,
+        subject_id = "P4",
+        grouping = "fast",
+        colname = "P4_fast"
+    ),
+    pseudobulk_maker(
+        .data = as.data.frame(proteomics_data),
+        metadata = metadata,
+        subject_id = "P5",
+        grouping = "fast",
+        colname = "P5_fast"
+    )
+)
+
+data_grouping_pseudobulk <- data.frame(
+    "sample_ID" = c(
+        "P1_slow",
+        "P2_slow",
+        "P3_slow",
+        "P4_slow",
+        "P5_slow",
+        "P1_fast",
+        "P2_fast",
+        "P3_fast",
+        "P4_fast",
+        "P5_fast"
+    ),
+    "fiber_type" = c(
+        "slow",
+        "slow",
+        "slow",
+        "slow",
+        "slow",
+        "fast",
+        "fast",
+        "fast",
+        "fast",
+        "fast"
+    )
+)
+
+data_limma <- data_pseudobulk |>
+    limma::normalizeBetweenArrays(method = "quantile")
+
+vector_factor_fiber_type <- factor(data_grouping_pseudobulk$fiber_type,
+                                   levels = c(
+                                       "slow",
+                                       "fast"
+                                   )
+)
+
+design_matrix <-
+    model.matrix(
+        ~ 0 + vector_factor_fiber_type,
+        data_grouping_pseudobulk
+    )
+
+colnames(design_matrix) <- c(
+    "slow",
+    "fast"
+)
+
+fit <- limma::lmFit(
+    data_limma,
+    design_matrix
+)
+
+contrast_matrix <- limma::makeContrasts(
+    "slow_vs_fast" = slow - fast,
+    levels = design_matrix
+)
+
+tmp <- limma::contrasts.fit(
+    fit,
+    contrast_matrix
+)
+
+tmp <- limma::eBayes(tmp)
+
+DE_results <- limma::topTable(tmp,
+                              sort.by = "P",
+                              n = Inf
+)
+
+data_volcano <- DE_results |>
+    dplyr::mutate("signifficant" = dplyr::case_when(
+        adj.P.Val < 0.05 & logFC > 0 ~ "enriched in slow",
+        adj.P.Val < 0.05 & logFC < 0 ~ "enriched in fast",
+        TRUE ~ "not signifficant"
+    )) |>
+    tibble::rownames_to_column("Genes")
+
+data_volcano <- limma::topTable(tmp,
+                                sort.by = "P",
+                                n = Inf
+) |>
+    dplyr::mutate("signifficant" = dplyr::case_when(
+        adj.P.Val < 0.05 & logFC > 1 ~ "highly upregulated in slow",
+        adj.P.Val < 0.05 & logFC > 0 & logFC < 2 ~ "upregulated in slow",
+        adj.P.Val < 0.05 & logFC < -1 ~ "highly upregulated in fast",
+        adj.P.Val < 0.05 & logFC < 0 & logFC > -2 ~ "upregulated in fast",
+        TRUE ~ "not signifficant"
+    )) |>
+    dplyr::mutate(labelling = dplyr::case_when(
+        adj.P.Val < 0.05 & logFC > 0 ~ "slow",
+        adj.P.Val < 0.05 & logFC < 0 ~ "fast",
+        TRUE ~ "not signifficant"
+    )) |>
+    tibble::rownames_to_column("Genes") |>
+    dplyr::mutate("value" = -log10(P.Value)) |>
+    dplyr::mutate("names" = dplyr::case_when(
+        Genes %in% c(
+            "MYH2",
+            "USP28",
+            "ZC3H8",
+            "USP48",
+            "TNNC2",
+            "LDHA",
+            "MYH7",
+            "SUB1",
+            "TNNT1",
+            "DPYSL3",
+            "TPM3",
+            "LDHB"
+        ) ~ Genes,
+        TRUE ~ ""
+    ))
+
+data_volcano$signifficant <- factor(data_volcano$signifficant,
+                                    levels = c("highly upregulated in slow",
+                                               "upregulated in slow",
+                                               "not signifficant",
+                                               "upregulated in fast",
+                                               "highly upregulated in fast"))
+
+data_volcano |>
+    ggplot2::ggplot(ggplot2::aes(
+        x = logFC,
+        y = -log10(P.Value),
+        color = signifficant,
+        label = names
+    )) +
+    ggplot2::geom_point(
+        size = 0.5,
+        alpha = ifelse(data_volcano$signifficant == "not signifficant", 1, 1)
+    ) +
+    ggplot2::scale_color_manual(
+        values = c(
+            "#440154FF",
+            "#f0b3fe",
+            "grey",
+            "#c6ecc8",
+            "#5DC863FF"
+        ),
+        name = ""
+    ) +
+    ggrepel::geom_label_repel(
+        data = data_volcano |>
+            dplyr::filter(!names == ""),
+        mapping = ggplot2::aes(
+            x = logFC,
+            y = -log10(P.Value),
+            fill = labelling,
+            label = names
+        ),
+        color = "black",
+        size = 2,
+        label.padding = 0.1,
+        min.segment.length = 0.1,
+        segment.size = 0.2,
+        force = 20
+    ) +
+    ggplot2::scale_fill_manual(values = c(
+        "#e5f5e0",
+        "#efedf5"
+    )) +
+    ggplot2::ggtitle("Slow Vs Fast Proteomics") +
+    ggplot2::theme_classic() +
+    ggplot2::theme(
+        text = ggplot2::element_text(
+            face = "bold",
+            size = 12,
+            colour = "black"
+        ),
+        strip.text = ggplot2::element_text(colour = "white"),
+        strip.background = ggplot2::element_rect(fill = "black"),
+        legend.position = "none",
+        plot.title = ggplot2::element_text(hjust = 0.5)
+    ) +
+    ggplot2::xlab("log2FC (Slow - Fast)") +
+    ggplot2::ylab("-log10(P-value)") +
+    ggplot2::theme(
+        text = ggplot2::element_text(size = 7),
+        legend.position = "none"
+    )
+
+ggplot2::ggsave(
+    here::here("doc/figures/figure_4/figure_4_B.png"),
+    device = "png",
+    height = 60,
+    width = 60,
+    units = "mm"
+)
+
+# write.csv(data_pseudobulk,
+#           here::here("data/data_proteomics_pseudobulk.csv"))
+
+# write.csv(DE_results,
+#           file = here::here("data/DE_analysis_slow_vs_fast_proteomics.csv")
+# )
+
+# Inlay plot: -------------------------------------------------------------
+
+data_proteomics <- read.csv(here::here("data/proteomics_pca_data.csv")) # 974 fibers for 1685 proteins
+
+data_proteomics <- data_proteomics |>
+    dplyr::rename("Protein" = 1) |>
+    tibble::column_to_rownames("Protein")
+
+metadata <- metadata |>
+    tibble::column_to_rownames("...1")
+
+# Seurat workflow ---------------------------------------------------------
+
+seurat_proteome <- Seurat::CreateSeuratObject(counts = data_proteomics,
+                                              meta.data = metadata)
+
+seurat_proteome[["RNA"]]$data <- seurat_proteome[["RNA"]]$counts
+
+################################################################################################################################################
+########################################################      PCA   ############################################################################
+################################################################################################################################################
+
+# Find Variable features
+seurat_proteome <- Seurat::FindVariableFeatures(seurat_proteome,
+                                                selection.method = "vst")
+
+# Scale data
+seurat_proteome <- Seurat::ScaleData(seurat_proteome)
+
+#  Run PCA------------------------------------------------
+seurat_proteome <- Seurat::RunPCA(object = seurat_proteome,
+                                  features = Seurat::VariableFeatures(object = seurat_proteome))
+
+# Determine the K-nearest neighbor graph (dims is the selected number of PCs from previous step)
+seurat_proteome <- Seurat::FindNeighbors(object = seurat_proteome,  dims = 1:6)
+
+# Determine the clusters for various resolutions (resolution between 0.4-1.4 is often best for scRNAseq --> determine which resolution is best for our dataset)
+seurat_proteome <- Seurat::FindClusters(object = seurat_proteome, resolution = c(0.4))
+
+################################################################################################################################################
+################################################      DIMENSIONALITY REDUCTION   ##############################################################
+################################################################################################################################################
+
+# Run UMAP ----------------------------------------------------------------
+seurat_proteome <- Seurat::RunUMAP(seurat_proteome, dims = 1:6)
+
+Seurat::DimPlot(
+    seurat_proteome,
+    reduction = "umap",
+    label = FALSE,
+    label.size = 1,
+    pt.size = 0.05,
+    group.by = "fiber_type_seurat"
+)
+
+seurat_proteome[["umap"]]@cell.embeddings |>
+    as.data.frame() |>
+    ggplot2::ggplot(
+        ggplot2::aes(x = UMAP_1,
+                     y = UMAP_2,
+                     color = metadata$fiber_type_seurat)
+    ) +
+    ggplot2::geom_point(size = 0.025,
+                        alpha = 0.5) +
+    ggplot2::scale_color_manual(values = c(
+        "#5DC863FF",
+        "#440154FF"
+    )) +
+    ggplot2::theme_classic() +
+    ggplot2::theme(
+        text = ggplot2::element_blank(),
+        legend.position = "none",
+        axis.text = ggplot2::element_blank(),
+        axis.ticks = ggplot2::element_blank(),
+        plot.title = ggplot2::element_blank(),
+        plot.margin=grid::unit(c(0,0,0,0), "mm"),
+    )
+
+ggplot2::ggsave(here::here("doc/figures/figure_4/figure_4B_inlay.png"),
+                units = "mm",
+                height = 12.5,
+                width = 12.5)
+
 ################################################################################################################################################
 #############################################       FIGURE 4C - TRANSCRIPTOMICS    #############################################################
 ################################################################################################################################################
@@ -268,6 +658,82 @@ annotate_figure(featureplots, top = text_grob("Transcriptomics",
 ggsave(here::here("doc/figures/figure_4/figure_4C_transcriptomics.png"),
        width = 60,
        height = 45,
+       units="mm")
+
+
+# Feature plots proteomics: -----------------------------------------------
+
+feature_plot_USP28 <- Seurat::FeaturePlot(seurat_proteome,
+                                          features = c("USP28"),
+                                          pt.size = 0.1) +
+    ggplot2::theme_classic() +
+    ggplot2::scale_colour_viridis_c(option = "plasma") +
+    ggplot2::theme(
+        text = ggplot2::element_text(face="bold", colour="black", size=4),
+        axis.text = ggplot2::element_blank(),
+        axis.ticks = ggplot2::element_blank(),
+        plot.title = ggplot2::element_text(hjust = 0.5, size=5),
+        legend.position = "bottom",
+        legend.key.size = ggplot2::unit(2, 'mm'),
+        legend.spacing.x = ggplot2::unit(2, "mm"),
+        plot.margin=grid::unit(c(0,0,0,0), "mm")
+    ) +
+    ggplot2::xlab("UMAP1") +
+    ggplot2::ylab("UMAP2")
+
+feature_plot_USP28 <- Seurat::FeaturePlot(seurat_proteome,
+                                          features = c("USP28"),
+                                          pt.size = 0.1) +
+    ggplot2::theme_classic() +
+    ggplot2::scale_colour_viridis_c(option = "plasma") +
+    ggplot2::theme(
+        text = ggplot2::element_text(face="bold", colour="black", size=4),
+        axis.text = ggplot2::element_blank(),
+        axis.ticks = ggplot2::element_blank(),
+        plot.title = ggplot2::element_text(hjust = 0.5, size=5, vjust = 0.1),
+        legend.position = "right",
+        legend.key.size = ggplot2::unit(2, 'mm'),
+        legend.key.width = ggplot2::unit(1, "mm"),
+        legend.spacing.x = ggplot2::unit(0.5, "mm"),
+        legend.margin=margin(0,0,0,0),
+        plot.margin=grid::unit(c(0,0,0,0), "mm")
+    ) +
+    ggplot2::xlab("UMAP1") +
+    ggplot2::ylab("UMAP2")
+
+feature_plot_DPYSL3 <- Seurat::FeaturePlot(seurat_proteome,
+                                           features = c("DPYSL3"),
+                                           pt.size = 0.1) +
+    ggplot2::theme_classic() +
+    ggplot2::scale_colour_viridis_c(option = "plasma") +
+    ggplot2::theme(
+        text = ggplot2::element_text(face="bold", colour="black", size=4),
+        axis.text = ggplot2::element_blank(),
+        axis.ticks = ggplot2::element_blank(),
+        plot.title = ggplot2::element_text(hjust = 0.5, size=5, vjust = 0.1),
+        legend.position = "right",
+        legend.key.size = ggplot2::unit(2, 'mm'),
+        legend.key.width = ggplot2::unit(1, "mm"),
+        legend.spacing.x = ggplot2::unit(0.5, "mm"),
+        legend.margin=margin(0,0,0,0),
+        plot.margin=grid::unit(c(0,0,0,0), "mm")
+    ) +
+    ggplot2::xlab("UMAP1") +
+    ggplot2::ylab("UMAP2")
+
+featureplots <- ggpubr::ggarrange(feature_plot_USP28,
+                                  feature_plot_DPYSL3,
+                                  ncol = 2,
+                                  nrow = 1) +
+    ggplot2::theme(plot.margin=grid::unit(c(0,0,0,0), "mm"))
+
+featureplots <- annotate_figure(featureplots, top = text_grob("Proteomics",
+                                                              color = "black", face = "bold", size = 7))
+
+ggsave(featureplots,
+       filename = "doc/figures/figure_4/figure_4C_proteomics.png",
+       width = 60,
+       height = 25,
        units="mm")
 
 ################################################################################################################################################
