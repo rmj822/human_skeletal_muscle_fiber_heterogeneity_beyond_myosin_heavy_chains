@@ -229,7 +229,7 @@ MYH7_curve <- DropletUtils::barcodeRanks(MYH7_curve, lower = 10)
 
 bottom_knee_MYH7 <- 100 - MYH7_curve@metadata$knee
 
-MYH7_curve_plot <- counts_ft %>%
+counts_ft %>%
     dplyr::select(MYH7_fraction, order_MYH7) %>%
     ggplot2::ggplot(
         ggplot2::aes(order_MYH7,
@@ -254,7 +254,7 @@ MYH2_curve <- DropletUtils::barcodeRanks(MYH2_curve, lower = 10)
 
 bottom_knee_MYH2 <- 100 - MYH2_curve@metadata$knee
 
-MYH2_curve_plot <- counts_ft %>%
+counts_ft %>%
     dplyr::select(MYH2_fraction, order_MYH2) %>%
     ggplot2::ggplot(
         ggplot2::aes(order_MYH2,
@@ -279,7 +279,7 @@ MYH1_curve <- DropletUtils::barcodeRanks(MYH1_curve, lower = 10)
 
 bottom_knee_MYH1 <- 100 - MYH1_curve@metadata$knee
 
-MYH1_curve_plot <- counts_ft %>%
+counts_ft %>%
     dplyr::select(MYH1_fraction, order_MYH1) %>%
     ggplot2::ggplot(
         ggplot2::aes(order_MYH1,
@@ -1455,7 +1455,41 @@ write.csv(seurat_metadata,
 # Run T-SNE ----------------------------------------------------------------
 seurat_proteome <- Seurat::RunTSNE(seurat_proteome, dims = 1:6)
 
+################################################################################################################################################
+########################################################      PANEL G   ############################################################################
+################################################################################################################################################
 
+load(here::here("data/figure_4/filtered_normalized_fibertype_reclustered_seurat_wo_MSTRG_rest.Rdata"))
+
+Seurat::DimPlot(filtered_normalized_fibertype_reclustered_seurat_wo_MSTRG_rest,
+                                 label = FALSE,
+                                 reduction = "umap",
+                                 cols = c("#440154FF", "#8CB3E8", "#5DC863FF", "#fdc325", "#D2631C"),
+                                 pt.size = 1,
+                                 group.by = "fiber_type_MYH_hybrids") +
+    guides(color = guide_legend(override.aes = list(size=1))) +
+    theme_minimal() +
+    ggtitle("UMAP Transcriptomics - by fiber type") +
+    xlab("UMAP1") +
+    ylab("UMAP2") +
+    theme(
+        legend.position = "none",
+        text = element_text(face="bold", colour="black", size=8),
+        axis.text = element_text(size=8),
+        strip.text = element_text(colour = "white"),
+        strip.background = element_rect(fill="black"),
+        plot.title = element_text(hjust = 0.5)
+    ) +
+    scale_y_continuous(breaks=c(-40, -20, 0, 20),
+                       labels=c("40", "20", "0", "-20")
+    )
+
+ggplot2::ggsave(
+here::here("doc/figures/figure_1/UMAP_transcriptomics_fiber_type.png"),
+height = 60,
+width = 70,
+units = "mm"
+)
 
 ################################################################################################################################################
 #################################################     Panel H  ##############################################################
@@ -1495,6 +1529,92 @@ Seurat::DimPlot(
 #     width = 65,
 #     units = "mm"
 # )
+
+################################################################################################################################################
+#################################################     Panel I  ##############################################################
+################################################################################################################################################
+
+
+
+# Set identify of clusters
+Idents(object = filtered_normalized_fibertype_reclustered_seurat_wo_MSTRG_rest) <- "final_cluster"
+
+# Set to SCT assay for visualization, and log-transform data ------------------------------
+
+# MYH7
+feature_plot_transcriptomics_MYH7 <- Seurat::FeaturePlot(object = filtered_normalized_fibertype_reclustered_seurat_wo_MSTRG_rest,
+                                                         features = c("MYH7"),
+                                                         pt.size = 0.1) +
+    ggplot2::theme_classic() +
+    ggplot2::scale_colour_viridis_c(option = "plasma") +
+    ggplot2::theme(
+        text = ggplot2::element_text(face="bold", colour="black", size=4),
+        axis.text = ggplot2::element_blank(),
+        axis.ticks = ggplot2::element_blank(),
+        plot.title = ggplot2::element_text(hjust = 0.5, size=5),
+        legend.position = "none",
+        legend.key.size = ggplot2::unit(2, 'mm'),
+        legend.spacing.x = ggplot2::unit(2, "mm"),
+        plot.margin=grid::unit(c(0,0,0,0), "mm")
+    ) +
+    ggplot2::xlab("UMAP1") +
+    ggplot2::ylab("UMAP2")
+
+# MYH2
+feature_plot_transcriptomics_MYH2 <- Seurat::FeaturePlot(object = filtered_normalized_fibertype_reclustered_seurat_wo_MSTRG_rest,
+                                                         features = c("MYH2"),
+                                                         pt.size = 0.1) +
+    ggplot2::theme_classic() +
+    ggplot2::scale_colour_viridis_c(option = "plasma") +
+    ggplot2::theme(
+        text = ggplot2::element_text(face="bold", colour="black", size=4),
+        axis.text = ggplot2::element_blank(),
+        axis.ticks = ggplot2::element_blank(),
+        plot.title = ggplot2::element_text(hjust = 0.5, size=5),
+        legend.position = "none",
+        legend.key.size = ggplot2::unit(2, 'mm'),
+        legend.spacing.x = ggplot2::unit(2, "mm"),
+        plot.margin=grid::unit(c(0,0,0,0), "mm")
+    ) +
+    ggplot2::xlab("UMAP1") +
+    ggplot2::ylab("UMAP2")
+
+# MYH1
+feature_plot_transcriptomics_MYH1 <- Seurat::FeaturePlot(object = filtered_normalized_fibertype_reclustered_seurat_wo_MSTRG_rest,
+                                                         features = c("MYH1"),
+                                                         pt.size = 0.1) +
+    ggplot2::theme_classic() +
+    ggplot2::scale_colour_viridis_c(option = "plasma") +
+    ggplot2::theme(
+        text = ggplot2::element_text(face="bold", colour="black", size=4),
+        axis.text = ggplot2::element_blank(),
+        axis.ticks = ggplot2::element_blank(),
+        plot.title = ggplot2::element_text(hjust = 0.5, size=5),
+        legend.position = "none",
+        legend.key.size = ggplot2::unit(2, 'mm'),
+        legend.spacing.x = ggplot2::unit(2, "mm"),
+        plot.margin=grid::unit(c(0,0,0,0), "mm")
+    ) +
+    ggplot2::xlab("UMAP1") +
+    ggplot2::ylab("UMAP2")
+
+ggpubr::ggarrange(feature_plot_transcriptomics_MYH7,
+                                  feature_plot_transcriptomics_MYH2,
+                                  feature_plot_transcriptomics_MYH1,
+                                  ncol = 3,
+                                  nrow = 1,
+                                  legend = "none") +
+    ggplot2::ggtitle("Transcriptomics") +
+    ggplot2::theme(
+        plot.title = ggplot2::element_text(hjust = 0.5,
+                                           size = 8,
+                                           face = "bold"),
+    )
+
+ggplot2::ggsave(here::here("doc/figures/figure_1/feature_plot_MYHs_transcriptomics.png"),
+                width = 100,
+                height = 33,
+                units = "mm")
 
 ################################################################################################################################################
 ########################################################      PANEL J   ############################################################################
