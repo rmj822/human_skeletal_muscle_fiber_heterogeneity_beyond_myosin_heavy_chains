@@ -179,7 +179,7 @@ combined_plot <- ggpubr::ggarrange(transcriptomics_plot,
 )
 
 # ggsave(combined_plot,
-#        filename = here::here("doc/figures/figure_1_S2/fiber_type_participant_combined.png"),
+#        filename = here::here("doc/figures/figure_1_S2/figure_1_S2A.png"),
 #        width = 195,
 #        height = 60,
 #        units = "mm")
