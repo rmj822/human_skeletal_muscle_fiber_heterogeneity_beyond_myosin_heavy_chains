@@ -66,6 +66,10 @@ my_cols <- c("#440154FF", "#8CB3E8", "#5DC863FF", "#fdc325", "#D2631C")
 ################################################################################################################################################
 
 pca_proteomics <- data_pca |>
+    dplyr::mutate(
+        PC2 = PC2 * -1,
+        PC1 = PC1 * -1
+    ) |>
     ggplot2::ggplot(
         ggplot2::aes(
             x = PC1,
@@ -704,6 +708,107 @@ ggsave(here::here("doc/figures/figure_2/figure_2E.png"),
 ###############################################      FIGURE 2F   ##########################################################
 ################################################################################################################################################
 
+data_proteomics <- read.csv(here::here("data/proteomics_pca_data.csv")) # 974 fibers for 1685 proteins
+data_proteomics <- data_proteomics |>
+    dplyr::rename("Protein" = 1) |>
+    tibble::column_to_rownames("Protein")
+metadata <- vroom::vroom(
+    here::here("data/metadata_proteomics_fiber_type.csv")
+) |>
+    dplyr::select(!1)
+seurat_proteome <- Seurat::CreateSeuratObject(counts = data_proteomics,
+                                              meta.data = metadata)
+# Find Variable features
+seurat_proteome <- Seurat::FindVariableFeatures(seurat_proteome,
+                                                selection.method = "vst")
+# Scale data
+seurat_proteome <- Seurat::ScaleData(seurat_proteome)
+#  Run PCA------------------------------------------------
+seurat_proteome <- Seurat::RunPCA(object = seurat_proteome,  features = Seurat::VariableFeatures(object = seurat_proteome))
+# Determine the K-nearest neighbor graph (dims is the selected number of PCs from previous step)
+seurat_proteome <- Seurat::FindNeighbors(object = seurat_proteome,  dims = 1:6)
+# Determine the clusters for various resolutions (resolution between 0.4-1.4 is often best for scRNAseq --> determine which resolution is best for our dataset)
+seurat_proteome <- Seurat::FindClusters(object = seurat_proteome, resolution = c(0.4))
+# Dimensionality reduction
+# Run UMAP ----------------------------------------------------------------
+seurat_proteome <- Seurat::RunUMAP(seurat_proteome, dims = 1:6)
+
+# feature plot UGDH -------------------------------------------------------
+
+feature_plot_UGDH <- Seurat::FeaturePlot(seurat_proteome,
+                                         features = c("UGDH"),
+                                         pt.size = 0.1) +
+    ggplot2::theme_classic() +
+    ggplot2::scale_colour_viridis_c(option = "plasma") +
+    ggplot2::theme(
+        text = ggplot2::element_text(face="bold", colour="black", size=4),
+        axis.text = ggplot2::element_blank(),
+        axis.ticks = ggplot2::element_blank(),
+        plot.title = ggplot2::element_text(hjust = 0.5, size=5, vjust = 0.1),
+        legend.position = "right",
+        legend.key.size = ggplot2::unit(2, 'mm'),
+        legend.key.width = ggplot2::unit(1, "mm"),
+        legend.spacing.x = ggplot2::unit(0.5, "mm"),
+        legend.margin = ggplot2::margin(0,0,0,0),
+        plot.margin=grid::unit(c(0,0,0,0), "mm")
+    ) +
+    ggplot2::xlab("UMAP1") +
+    ggplot2::ylab("UMAP2")
+
+feature_plot_PHIP <- Seurat::FeaturePlot(seurat_proteome,
+                                         features = c("PHIP"),
+                                         pt.size = 0.1) +
+    ggplot2::theme_classic() +
+    ggplot2::scale_colour_viridis_c(option = "plasma") +
+    ggplot2::theme(
+        text = ggplot2::element_text(face="bold", colour="black", size=4),
+        axis.text = ggplot2::element_blank(),
+        axis.ticks = ggplot2::element_blank(),
+        plot.title = ggplot2::element_text(hjust = 0.5, size=5, vjust = 0.1),
+        legend.position = "right",
+        legend.key.size = ggplot2::unit(2, 'mm'),
+        legend.key.width = ggplot2::unit(1, "mm"),
+        legend.spacing.x = ggplot2::unit(0.5, "mm"),
+        legend.margin= ggplot2::margin(0,0,0,0),
+        plot.margin=grid::unit(c(0,0,0,0), "mm")
+    ) +
+    ggplot2::xlab("UMAP1") +
+    ggplot2::ylab("UMAP2")
+
+feature_plot_hist <- Seurat::FeaturePlot(seurat_proteome,
+                                         features = c("HIST1H2AB"),
+                                         pt.size = 0.1) +
+    ggplot2::theme_classic() +
+    ggplot2::scale_colour_viridis_c(option = "plasma") +
+    ggplot2::theme(
+        text = ggplot2::element_text(face="bold", colour="black", size=4),
+        axis.text = ggplot2::element_blank(),
+        axis.ticks = ggplot2::element_blank(),
+        plot.title = ggplot2::element_text(hjust = 0.5, size=5, vjust = 0.1),
+        legend.position = "right",
+        legend.key.size = ggplot2::unit(2, 'mm'),
+        legend.key.width = ggplot2::unit(1, "mm"),
+        legend.spacing.x = ggplot2::unit(0.5, "mm"),
+        legend.margin= ggplot2::margin(0,0,0,0),
+        plot.margin=grid::unit(c(0,0,0,0), "mm")
+    ) +
+    ggplot2::xlab("UMAP1") +
+    ggplot2::ylab("UMAP2")
+
+final_plot <- ggpubr::ggarrange(feature_plot_UGDH,
+                                feature_plot_PHIP,
+                                feature_plot_hist,
+                                ncol = 3,
+                                nrow = 1) +
+    ggplot2::theme(plot.margin=grid::unit(c(0,0,0,0), "mm"))
+
+ggpubr::annotate_figure(final_plot, top = ggpubr::text_grob("Proteomics",
+                                                            color = "black", face = "bold", size = 8))
+
+# ggplot2::ggsave(here::here("doc/figures/figure_2/figure_2F.png"),
+#                 units = "mm",
+#                 width = 120,
+#                 height = 35)
 
 
 ################################################################################################################################################

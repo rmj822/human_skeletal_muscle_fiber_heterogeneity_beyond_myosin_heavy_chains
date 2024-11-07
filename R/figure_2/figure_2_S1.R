@@ -47,7 +47,7 @@ counts_ft_transcriptomics %>%
     annotate("text", x=600, y=55, label= "ATP2A2: r = 0.92, p < 0.001", colour="#BC4749", fontface=2, hjust=0, size=2.5) +
     annotate("text", x=600, y=45, label= "MYL3: r = 0.88, p < 0.001", colour="orange", fontface=2, hjust=0, size=2.5)
 
-ggsave(here::here("doc/figures/figure_2/figure_2_S1A.png"),
+ggsave(here::here("doc/figures/figure_2_S1/figure_2_S1A.png"),
        width = 128,
        height = 60,
        units="mm")
@@ -189,7 +189,7 @@ upset_slow_transcriptomics_df %>%
         legend.position = "none",
     )
 
-ggsave(here::here("doc/figures/figure_2/figure_2_S1C.png"),
+ggsave(here::here("doc/figures/figure_2_S1/figure_2_S1C.png"),
        width = 60,
        height = 60,
        units="mm")
@@ -830,7 +830,7 @@ all_curves |>
     ggplot2::ylab("% slow isoform expressed") +
     ggplot2::xlab("Sample (ranked by MYH7 expression)")
 
-ggsave(here::here("doc/figures/figure_2/figure_2_S1B.png"),
+ggsave(here::here("doc/figures/figure_2_S1/figure_2_S1B.png"),
        width = 128,
        height = 60,
        units="mm")
@@ -992,7 +992,7 @@ upset_slow_df  |>
         legend.position = "none",
     )
 
-ggsave(here::here("doc/figures/figure_2/figure_2_S1D.png"),
+ggsave(here::here("doc/figures/figure_2_S1/figure_2_S1D.png"),
        width = 60,
        height = 60,
        units="mm")
