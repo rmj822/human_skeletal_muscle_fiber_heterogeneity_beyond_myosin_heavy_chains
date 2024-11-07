@@ -1,4 +1,4 @@
-# Human Skeletal Muscle Fiber Heterogeneity Beyond 1 Myosin Heavy Chains
+# Human Skeletal Muscle Fiber Heterogeneity Beyond Myosin Heavy Chains
 
 Github repository with all code used for this manuscript (provide link once available). 
 The repo is maintained my Thibaux Van der Stede, Ben Stocks and Roger Moreno-Justicia.
